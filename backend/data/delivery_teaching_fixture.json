@@ -1,0 +1,31 @@
+{
+  "metadata": {
+    "id": "hcmc-delivery-teaching-fixture-v1",
+    "name": "HCMC Delivery Teaching Fixture",
+    "city": "Thành phố Hồ Chí Minh",
+    "country": "Việt Nam",
+    "version": "1.0.0",
+    "source": "Small synthetic graph for deterministic API tests",
+    "generated_at": "2026-08-09",
+    "description": "A compact delivery graph used only by automated tests.",
+    "disclaimer": "Synthetic test fixture; not navigation data."
+  },
+  "nodes": [
+    {"id": "courier_hub", "name": "Điểm tập kết giao hàng", "kind": "delivery_depot", "lat": 10.7710, "lon": 106.6880, "attributes": {"delivery_destination": true, "routing_component": "primary"}},
+    {"id": "junction_a", "name": "Nút giao A", "kind": "intersection", "lat": 10.7720, "lon": 106.6910, "attributes": {"routing_component": "primary"}},
+    {"id": "junction_b", "name": "Nút giao B", "kind": "intersection", "lat": 10.7740, "lon": 106.6940, "attributes": {"routing_component": "primary"}},
+    {"id": "ben_thanh_market", "name": "Chợ trung tâm", "kind": "delivery_market", "lat": 10.7730, "lon": 106.6970, "attributes": {"delivery_destination": true, "routing_component": "primary"}},
+    {"id": "coop_mart", "name": "Siêu thị Co.op", "kind": "delivery_supermarket", "lat": 10.7760, "lon": 106.6920, "attributes": {"delivery_destination": true, "routing_component": "primary"}},
+    {"id": "city_university", "name": "Trường đại học thành phố", "kind": "delivery_university", "lat": 10.7770, "lon": 106.6960, "attributes": {"delivery_destination": true, "routing_component": "primary"}},
+    {"id": "saigon_bus_station", "name": "Bến xe Sài Gòn", "kind": "delivery_bus_station", "lat": 10.7690, "lon": 106.6950, "attributes": {"delivery_destination": true, "routing_component": "primary"}}
+  ],
+  "edges": [
+    {"id": "fixture_01", "source": "courier_hub", "target": "junction_a", "distance_m": 360, "speed_kph": 30, "road_name": "Đường lấy hàng", "road_class": "tertiary", "risk": 0.10, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 1.4}},
+    {"id": "fixture_02", "source": "junction_a", "target": "junction_b", "distance_m": 440, "speed_kph": 35, "road_name": "Trục giao nhận", "road_class": "secondary", "risk": 0.16, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 2.1}},
+    {"id": "fixture_03", "source": "junction_a", "target": "ben_thanh_market", "distance_m": 680, "speed_kph": 30, "road_name": "Đường Chợ", "road_class": "tertiary", "risk": 0.12, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 2.8}},
+    {"id": "fixture_04", "source": "junction_b", "target": "coop_mart", "distance_m": 390, "speed_kph": 30, "road_name": "Đường Siêu thị", "road_class": "tertiary", "risk": 0.08, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 1.8}},
+    {"id": "fixture_05", "source": "junction_b", "target": "city_university", "distance_m": 520, "speed_kph": 35, "road_name": "Đường Đại học", "road_class": "secondary", "risk": 0.14, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 2.0}},
+    {"id": "fixture_06", "source": "ben_thanh_market", "target": "saigon_bus_station", "distance_m": 470, "speed_kph": 25, "road_name": "Đường Bến xe", "road_class": "tertiary", "risk": 0.18, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 2.4}},
+    {"id": "fixture_07", "source": "ben_thanh_market", "target": "junction_b", "distance_m": 410, "speed_kph": 30, "road_name": "Lối tắt giao hàng", "road_class": "tertiary", "risk": 0.22, "traversable": true, "bidirectional": true, "attributes": {"source_direction": "two-way", "base_congestion": 3.1, "incident_prone": true, "close_during_incident": true}}
+  ]
+}
