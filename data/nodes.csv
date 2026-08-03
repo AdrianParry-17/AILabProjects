@@ -1,26 +1,26 @@
-node_id,name,latitude,longitude,district,type,osm_id,description
-1,Warehouse (Main Hub),10.8025,106.6545,Tan Binh,warehouse,366423309,Main delivery warehouse and distribution center
-2,Tan Son Nhat Airport,10.8188,106.6518,Tan Binh,landmark,12738755477,"International airport, major logistics hub"
-3,Ben Thanh Market,10.7725,106.698,District 1,market,411926070,"Central market, high delivery volume"
-4,Landmark 81,10.7955,106.722,Binh Thanh,landmark,5042605487,"Tallest building in Vietnam, modern landmark"
-5,Notre Dame Cathedral,10.7795,106.6995,District 1,landmark,411918767,"Historic cathedral, tourist area"
-6,Independence Palace,10.7765,106.6955,District 1,landmark,411918830,Historic government building
-7,HCMC University of Science,10.762,106.678,District 5,university,5780641547,"Major university, educational deliveries"
-8,HCMC University of Technology,10.769,106.659,District 10,university,11304234033,"Technical university, educational deliveries"
-9,Cho Lon Market (Binh Tay),10.752,106.662,District 6,market,1997154696,Large traditional market in Chinatown
-10,District 7 Hospital,10.738,106.712,District 7,hospital,2305138020,"Modern hospital, medical supplies"
-11,Pham Ngu Lao Street,10.769,106.692,District 1,residential,11096747636,"Backpacker area, tourist district"
-12,Tao Dan Park,10.778,106.685,District 1,park,3257247348,"Central park, recreational area"
-13,Saigon Post Office,10.781,106.7,District 1,office,411926547,"Central post office, business deliveries"
-14,Binh Thanh District Office,10.805,106.712,Binh Thanh,office,366468735,District government office
-15,Gia Dinh Hospital,10.808,106.678,Binh Thanh,hospital,5755379354,"Major hospital, medical supplies"
-16,Phu Nhuan District Market,10.795,106.675,Phu Nhuan,market,5765047075,"Local market, daily deliveries"
-17,Hoang Van Thu Park,10.798,106.662,Tan Binh,park,2081880899,Public park near airport
-18,AEON Mall Tan Phu,10.782,106.635,Tan Phu,shopping,366404501,"Large shopping mall, high delivery volume"
-19,District 5 General Hospital,10.758,106.668,District 5,hospital,6751175535,"General hospital, medical supplies"
-20,An Dong Market,10.762,106.665,District 5,market,5780574602,"Traditional market, daily deliveries"
-21,Thong Nhat Stadium,10.765,106.668,District 10,landmark,4623078282,Major sports stadium
-22,Dam Sen Park,10.772,106.645,District 11,park,4415684434,"Amusement park, recreational area"
-23,District 3 Office Building,10.785,106.685,District 3,office,5772101027,Business district office
-24,White Palace,10.798,106.685,Phu Nhuan,event_venue,366421376,Event and wedding venue
-25,Etown Building,10.795,106.658,Tan Binh,office,11414445910,"Business park, corporate deliveries"
+node_id,name,latitude,longitude,district,type,osm_id
+1,Warehouse (Main Hub),10.8025,106.6545,Tan Binh,warehouse,366423309
+2,Tan Son Nhat Airport,10.8188,106.6518,Tan Binh,landmark,12738755477
+3,Ben Thanh Market,10.7725,106.698,District 1,market,411926070
+4,Landmark 81,10.7955,106.722,Binh Thanh,landmark,5042605487
+5,Notre Dame Cathedral,10.7795,106.6995,District 1,landmark,411918767
+6,Independence Palace,10.7765,106.6955,District 1,landmark,411918830
+7,HCMC University of Science,10.762,106.678,District 5,university,5780641547
+8,HCMC University of Technology,10.769,106.659,District 10,university,11304234033
+9,Cho Lon Market (Binh Tay),10.752,106.662,District 6,market,1997154696
+10,District 7 Hospital,10.738,106.712,District 7,hospital,2305138020
+11,Pham Ngu Lao Street,10.769,106.692,District 1,residential,11096747636
+12,Tao Dan Park,10.778,106.685,District 1,park,3257247348
+13,Saigon Post Office,10.781,106.7,District 1,office,411926547
+14,Binh Thanh District Office,10.805,106.712,Binh Thanh,office,366468735
+15,Gia Dinh Hospital,10.808,106.678,Binh Thanh,hospital,5755379354
+16,Phu Nhuan District Market,10.795,106.675,Phu Nhuan,market,5765047075
+17,Hoang Van Thu Park,10.798,106.662,Tan Binh,park,2081880899
+18,AEON Mall Tan Phu,10.782,106.635,Tan Phu,shopping,366404501
+19,District 5 General Hospital,10.758,106.668,District 5,hospital,6751175535
+20,An Dong Market,10.762,106.665,District 5,market,5780574602
+21,Thong Nhat Stadium,10.765,106.668,District 10,landmark,4623078282
+22,Dam Sen Park,10.772,106.645,District 11,park,4415684434
+23,District 3 Office Building,10.785,106.685,District 3,office,5772101027
+24,White Palace,10.798,106.685,Phu Nhuan,event_venue,366421376
+25,Etown Building,10.795,106.658,Tan Binh,office,11414445910
