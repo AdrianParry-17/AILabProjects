@@ -323,7 +323,42 @@ def _bfs(context: SearchContext) -> SearchResult:
     return context.finish()
 
 def _dfs(context: SearchContext) -> SearchResult:
-    pass
+    trivial = _start_is_goal(context)
+    if trivial:
+        return trivial
+    stack: list[tuple[str, int]] = [(context.start, 0)]
+    discovered = {context.start}
+    parents: dict[str, tuple[str, str]] = {}
+    g_cost = {context.start: 0.0}
+    context.trace.emit("start", node_id=context.start, frontier_size=1, g_cost=0, depth=0)
+    while stack:
+        node, depth = stack.pop()
+        if not context.expand(node):
+            break
+        context.trace.emit(
+            "expand", node_id=node, frontier_size=len(stack),
+            explored_count=context.expanded_count, g_cost=g_cost[node], depth=depth,
+        )
+        if node == context.goal:
+            path, edges = _reconstruct(parents, context.start, context.goal)
+            return context.finish(path, edges)
+        candidates = list(context.traversable(context.graph.neighbors(node)))
+        for edge in reversed(candidates):
+            child = edge.target
+            if child in discovered:
+                continue
+            discovered.add(child)
+            parents[child] = (node, edge.id)
+            g_cost[child] = g_cost[node] + context.cost.edge_cost(edge)
+            stack.append((child, depth + 1))
+            context.generated_count += 1
+            context.trace.emit(
+                "discover", node_id=child, parent_id=node, edge_id=edge.id,
+                frontier_size=len(stack), explored_count=context.expanded_count,
+                g_cost=g_cost[child], depth=depth + 1,
+            )
+        context.update_frontier_peak(len(stack))
+    return context.finish()
 
 def _uniform_cost(context: SearchContext) -> SearchResult:
     trivial = _start_is_goal(context)
@@ -424,7 +459,48 @@ def _astar(context: SearchContext) -> SearchResult:
 
 
 def _greedy(context: SearchContext) -> SearchResult:
-    pass
+    trivial = _start_is_goal(context)
+    if trivial:
+        return trivial
+    counter = itertools.count()
+    initial_h = context.h(context.start)
+    heap: list[tuple[float, int, str]] = [(initial_h, next(counter), context.start)]
+    discovered = {context.start}
+    parents: dict[str, tuple[str, str]] = {}
+    g_cost = {context.start: 0.0}
+    context.trace.emit(
+        "start", node_id=context.start, frontier_size=1,
+        g_cost=0, h_cost=initial_h, f_cost=initial_h,
+    )
+    while heap:
+        node_h, _, node = heapq.heappop(heap)
+        if not context.expand(node):
+            break
+        context.trace.emit(
+            "expand", node_id=node, frontier_size=len(heap),
+            explored_count=context.expanded_count, g_cost=g_cost[node],
+            h_cost=node_h, f_cost=node_h,
+        )
+        if node == context.goal:
+            path, edges = _reconstruct(parents, context.start, context.goal)
+            return context.finish(path, edges)
+        for edge in context.traversable(context.graph.neighbors(node)):
+            child = edge.target
+            if child in discovered:
+                continue
+            discovered.add(child)
+            parents[child] = (node, edge.id)
+            g_cost[child] = g_cost[node] + context.cost.edge_cost(edge)
+            child_h = context.h(child)
+            heapq.heappush(heap, (child_h, next(counter), child))
+            context.generated_count += 1
+            context.trace.emit(
+                "discover", node_id=child, parent_id=node, edge_id=edge.id,
+                frontier_size=len(heap), explored_count=context.expanded_count,
+                g_cost=g_cost[child], h_cost=child_h, f_cost=child_h,
+            )
+        context.update_frontier_peak(len(heap))
+    return context.finish()
 
 def _bidirectional_dijkstra(context: SearchContext) -> SearchResult:
     trivial = _start_is_goal(context)
