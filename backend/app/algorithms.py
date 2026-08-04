@@ -335,7 +335,57 @@ def _dijkstra(context: SearchContext) -> SearchResult:
     return _uniform_cost(context) # Equivalent to UCS for this graph type
 
 def _astar(context: SearchContext) -> SearchResult:
-    pass
+    trivial = _start_is_goal(context)
+    if trivial:
+        return trivial
+    counter = itertools.count()
+    initial_h = context.h(context.start)
+    heap: list[tuple[float, int, float, str]] = [
+        (initial_h, next(counter), 0.0, context.start)
+    ]
+    distances = {context.start: 0.0}
+    parents: dict[str, tuple[str, str]] = {}
+    closed_best: dict[str, float] = {}
+    context.trace.emit(
+        "start", node_id=context.start, frontier_size=1,
+        g_cost=0, h_cost=initial_h, f_cost=initial_h,
+    )
+    while heap:
+        f_cost, _, current_cost, node = heapq.heappop(heap)
+        if current_cost > distances.get(node, inf) + 1e-12:
+            continue
+        if current_cost >= closed_best.get(node, inf) - 1e-12:
+            continue
+        if not context.expand(node):
+            break
+        closed_best[node] = current_cost
+        node_h = max(0.0, f_cost - current_cost)
+        context.trace.emit(
+            "expand", node_id=node, frontier_size=len(heap),
+            explored_count=context.expanded_count, g_cost=current_cost,
+            h_cost=node_h, f_cost=f_cost,
+        )
+        if node == context.goal:
+            path, edges = _reconstruct(parents, context.start, context.goal)
+            return context.finish(path, edges)
+        for edge in context.traversable(context.graph.neighbors(node)):
+            child = edge.target
+            candidate = current_cost + context.cost.edge_cost(edge)
+            if candidate + 1e-12 >= distances.get(child, inf):
+                continue
+            distances[child] = candidate
+            parents[child] = (node, edge.id)
+            child_h = context.h(child)
+            child_f = candidate + child_h
+            heapq.heappush(heap, (child_f, next(counter), candidate, child))
+            context.generated_count += 1
+            context.trace.emit(
+                "relax", node_id=child, parent_id=node, edge_id=edge.id,
+                frontier_size=len(heap), explored_count=context.expanded_count,
+                g_cost=candidate, h_cost=child_h, f_cost=child_f,
+            )
+        context.update_frontier_peak(len(heap))
+    return context.finish()
 
 
 def _greedy(context: SearchContext) -> SearchResult:
