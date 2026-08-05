@@ -1,3 +1,5 @@
+"""Small, dependency-free application settings."""
+
 from __future__ import annotations
 
 import os

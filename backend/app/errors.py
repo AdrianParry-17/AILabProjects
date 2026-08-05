@@ -1,3 +1,5 @@
+"""Errors that are safe to expose through the API."""
+
 from __future__ import annotations
 
 from typing import Any
