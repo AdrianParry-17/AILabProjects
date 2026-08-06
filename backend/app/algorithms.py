@@ -360,6 +360,10 @@ def _dfs(context: SearchContext) -> SearchResult:
         context.update_frontier_peak(len(stack))
     return context.finish()
 
+# Rewrote and split Dijkstra and UCS
+
+def _dijkstra(context: SearchContext) -> SearchResult:
+    pass
 
 def _uniform_cost(context: SearchContext) -> SearchResult:
     trivial = _start_is_goal(context)
@@ -704,7 +708,7 @@ def run_algorithm(
         "bfs": _bfs,
         "dfs": _dfs,
         "ucs": _uniform_cost,
-        "dijkstra": _uniform_cost,
+        "dijkstra": _dijkstra,
         "astar": _astar,
         "greedy_best_first": _greedy,
         "bidirectional_dijkstra": _bidirectional_dijkstra,
