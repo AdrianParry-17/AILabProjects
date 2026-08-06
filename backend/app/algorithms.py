@@ -363,7 +363,53 @@ def _dfs(context: SearchContext) -> SearchResult:
 # Rewrote and split Dijkstra and UCS
 
 def _dijkstra(context: SearchContext) -> SearchResult:
-    pass
+    trivial = _start_is_goal(context)
+    if trivial:
+        return trivial
+
+    counter = itertools.count()
+    heap: list[tuple[float, int, str]] = [(0.0, next(counter), context.start)]
+
+    distances = {context.start: 0.0}
+    parents: dict[str, tuple[str, str]] = {}
+    settled: set[str] = set()
+
+    context.trace.emit("start", node_id=context.start, frontier_size=1, g_cost=0, f_cost=0)
+
+    while heap:
+        distance, _, node = heapq.heappop(heap)
+
+        if (node in settled) or distance > distances.get(node, inf):
+            continue
+        if not context.expand(node):
+            break
+
+        settled.add(node)
+        context.trace.emit("expand", node_id=node, frontier_size=len(heap),
+                           explored_count=context.expanded_count,g_cost=distance,f_cost=distance)
+
+        if node == context.goal:
+            path, edges = _reconstruct(parents, context.start, context.goal)
+            return context.finish(path, edges)
+
+        for edge in context.traversable(context.graph.neighbors(node)):
+            neighbor = edge.target
+            new_distance = distance + context.cost.edge_cost(edge)
+
+            if new_distance + 1e-12 >= distances.get(neighbor, inf):
+                continue
+
+            distances[neighbor] = new_distance
+            parents[neighbor] = (node, edge.id)
+
+            heapq.heappush(heap, (new_distance, next(counter), neighbor))
+
+            context.generated_count += 1
+            context.trace.emit("relax", node_id=neighbor, parent_id=node,edge_id=edge.id,frontier_size=len(heap),
+                               explored_count=context.expanded_count, g_cost=new_distance, f_cost=new_distance)
+
+        context.update_frontier_peak(len(heap))
+    return context.finish()
 
 def _uniform_cost(context: SearchContext) -> SearchResult:
     trivial = _start_is_goal(context)
