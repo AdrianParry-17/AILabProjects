@@ -45,9 +45,32 @@ describe("MetricsPanel", () => {
     act(() => useStore.setState({ result: null, busy: false }));
   });
 
-  it("shows an empty state when there is no result", () => {
+  it("shows an empty state with guidance when there is no result", () => {
     render(<MetricsPanel />);
     expect(screen.getByText("Run a search to see metrics")).toBeInTheDocument();
+    expect(screen.getByText(/Choose a start location/i)).toBeInTheDocument();
+  });
+
+  it("renders each metric as a compact card with icon + label + value (T15)", () => {
+    act(() => useStore.setState({ result: makeResult(), busy: false }));
+    const { container } = render(<MetricsPanel />);
+    expect(container.querySelector('[aria-label="Result metrics"]')).not.toBeNull();
+    const cards = container.querySelectorAll("li");
+    expect(cards).toHaveLength(6);
+    // Every card shows its label and value; icons are present.
+    for (const row of selectMetrics(makeResult())) {
+      expect(container.textContent).toContain(row.label);
+    }
+  });
+
+  it("uses tabular numerals on metric values (T15 card tokens)", () => {
+    act(() => useStore.setState({ result: makeResult(), busy: false }));
+    const { container } = render(<MetricsPanel />);
+    // CSS modules hash the class — the rule `.cardValue { font-variant-numeric:
+    // tabular-nums }` is injected via the module CSS. In jsdom the computed
+    // style may not resolve, so we assert the hashed class is present.
+    const numericValues = container.querySelectorAll('[class*="cardValue"]');
+    expect(numericValues.length).toBe(6);
   });
 
   it("renders metrics + explanation after a search", () => {

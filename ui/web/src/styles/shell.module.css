@@ -12,23 +12,6 @@
   background: var(--c-bg);
 }
 
-/* Header (LAYOUT_SPEC §5): 64 px, white, bottom border only. */
-.header {
-  display: flex;
-  align-items: center;
-  flex: none;
-  height: var(--header-height);
-  padding: 0 var(--space-24);
-  background: var(--c-surface);
-  border-bottom: var(--border-hairline) solid var(--c-border);
-}
-
-.brand {
-  font-size: var(--fs-subtitle);
-  font-weight: var(--fw-bold);
-  color: var(--c-text);
-}
-
 /* Body (LAYOUT_SPEC §3): three columns. Visualization column expands to fill
    the remainder so it always remains the largest region (≥ 60% per §8). */
 .body {

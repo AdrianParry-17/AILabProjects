@@ -70,12 +70,14 @@ describe("ControlPanel", () => {
     readyStore();
     render(<ControlPanel />);
 
-    fireEvent.change(screen.getByLabelText("Start Location"), { target: { value: "A" } });
-    fireEvent.mouseDown(screen.getByRole("option", { name: "A" }));
+    // Each node's blob is "name\nid\nkind"; the fixtures' kinds are unique, so
+    // these queries resolve to exactly one option each.
+    fireEvent.change(screen.getByLabelText("Start Location"), { target: { value: "delivery_market" } });
+    fireEvent.mouseDown(screen.getByRole("option", { name: /delivery_market/i }));
     expect(useStore.getState().start).toBe("a");
 
-    fireEvent.change(screen.getByLabelText("Destination"), { target: { value: "B" } });
-    fireEvent.mouseDown(screen.getByRole("option", { name: "B" }));
+    fireEvent.change(screen.getByLabelText("Destination"), { target: { value: "delivery_supermarket" } });
+    fireEvent.mouseDown(screen.getByRole("option", { name: /delivery_supermarket/i }));
     expect(useStore.getState().goal).toBe("b");
   });
 

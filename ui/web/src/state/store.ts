@@ -6,8 +6,10 @@ import type {
   AlgorithmSummary,
   DeliveryEdge,
   DeliveryNode,
+  HealthResponse,
   HistoryRun,
   SearchResult,
+  VersionResponse,
 } from "../api/types";
 
 /** GUI_ROADMAP §8 — the only valid statuses. */
@@ -81,6 +83,14 @@ export interface GraphState extends SearchState, AnimationSlice {
   replayRunId: string | null;
   loadHistory: () => Promise<void>;
   replayRun: (id: string) => void;
+
+  /** Backend info (T14, UI_POLISH_SPEC §5): probed once at boot via the
+   *  existing `client.getHealth`/`getVersion` transport — no new endpoints,
+   *  no per-render traffic. `backendOk` is `true` once `/health` returns
+   *  `{status:"ok"}`. `version` carries the API version (api_version field). */
+  backendOk: boolean | null;
+  version: string | null;
+  loadBackendInfo: () => Promise<void>;
 }
 
 /** A stored run: the §11 summary plus the full `result` needed for replay. */
@@ -99,6 +109,8 @@ export const useStore = create<GraphState>()((set, get) => ({
   historyLoading: false,
   replay: false,
   replayRunId: null,
+  backendOk: null,
+  version: null,
   /** Active visualization renderer (UI_IMPLEMENTATION_PLAN §7 T08,
    *  MAP_RENDERING_SPEC §2). Default is "map" per spec; in P2 the map branch
    *  mounts the same GraphCanvas host until Leaflet lands in P3 (T11). */
@@ -283,4 +295,24 @@ export const useStore = create<GraphState>()((set, get) => ({
   },
 
   setSpeed: (m) => set({ speed: Math.max(0.5, Math.min(4, m)) }),
+
+  loadBackendInfo: async () => {
+    const next: { backendOk: boolean | null; version: string | null } = {
+      backendOk: useStore.getState().backendOk,
+      version: useStore.getState().version,
+    };
+    try {
+      const health: HealthResponse = await client.getHealth();
+      next.backendOk = health?.status === "ok";
+    } catch {
+      next.backendOk = false;
+    }
+    try {
+      const version: VersionResponse = await client.getVersion();
+      next.version = version?.api_version ?? null;
+    } catch {
+      next.version = useStore.getState().version;
+    }
+    set(next);
+  },
 }));

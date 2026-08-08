@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { Header } from "./components/Header";
 import { GraphPane } from "./components/GraphPane";
 import { InfoPanel } from "./components/InfoPanel";
 import { Sidebar } from "./components/Sidebar";
@@ -17,18 +18,18 @@ function App(): JSX.Element {
   const loadGraph = useStore((s) => s.loadGraph);
   const loadHistory = useStore((s) => s.loadHistory);
   const loadCatalog = useStore((s) => s.loadCatalog);
+  const loadBackendInfo = useStore((s) => s.loadBackendInfo);
 
   useEffect(() => {
     void loadGraph();
     void loadHistory();
     void loadCatalog();
-  }, [loadGraph, loadHistory, loadCatalog]);
+    void loadBackendInfo();
+  }, [loadGraph, loadHistory, loadCatalog, loadBackendInfo]);
 
   return (
     <div className={styles.shell}>
-      <header className={styles.header} role="banner">
-        <span className={styles.brand}>HCMC Delivery AI Search</span>
-      </header>
+      <Header />
       <div className={styles.body}>
         <Sidebar />
         <main className={styles.main} role="main">

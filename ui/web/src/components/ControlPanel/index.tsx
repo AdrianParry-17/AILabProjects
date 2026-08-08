@@ -6,6 +6,21 @@ import { AlgorithmSelector } from "../AlgorithmSelector";
 import { NodePicker, type NodeOption } from "../shared/NodePicker";
 import styles from "./index.module.css";
 
+/** Build the keyword blob (street, POI, etc.) from a DeliveryNode's free-form
+ *  attributes without inventing a new contract. Any attribute string values
+ *  join the search text — including the node kind label and the road class.
+ *  Falls back to an empty blob for nodes that have no extra metadata. */
+function nodeKeywords(node: { kind: string; attributes?: Record<string, unknown> }): string {
+  const parts: string[] = [];
+  if (node.attributes) {
+    for (const value of Object.values(node.attributes)) {
+      if (typeof value === "string" && value.trim()) parts.push(value);
+    }
+  }
+  parts.push(node.kind);
+  return parts.join(" ");
+}
+
 /**
  * ControlPanel (UI_IMPLEMENTATION_PLAN.md §7 T05, COMPONENT_POLISH_SPEC §4):
  * search configuration grouped into three ordered SectionCards — Search
@@ -27,7 +42,12 @@ export function ControlPanel(): JSX.Element {
   const runSearch = useStore((s) => s.runSearch);
 
   const nodes: NodeOption[] = useMemo(
-    () => (graph?.nodes ?? []).map((n) => ({ id: n.id, name: n.name || n.id })),
+    () =>
+      (graph?.nodes ?? []).map((n) => ({
+        id: n.id,
+        name: n.name || n.id,
+        keywords: nodeKeywords(n),
+      })),
     [graph],
   );
 

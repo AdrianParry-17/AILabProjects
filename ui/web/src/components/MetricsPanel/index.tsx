@@ -6,9 +6,12 @@ import { EmptyState } from "../shared/EmptyState";
 import styles from "./index.module.css";
 
 /**
- * MetricsPanel (§2.5 / D.6): the numeric outcome of the last search. Reads
- * `search.result`; derives rows via `selectMetrics` (tab numbers). The copy
- * button lazy-imports the export helper (§F.2).
+ * MetricsPanel (UI_TASK_BREAKDOWN §7 T15, UI_POLISH_SPEC §13,
+ * COMPONENT_POLISH_SPEC §11, LAYOUT_SPEC §21): compact uniform cards, not a
+ * table. Each card = icon + title + value (value contains its unit per the
+ * existing `lib/format` helpers — see `formatDistanceKm`/`formatMinutes`).
+ * 2-column grid on desktop via T01 card tokens (padding/radius/gap/border/
+ * bg/elevation). Empty state reuses the shared `EmptyState`.
  */
 export function MetricsPanel(): JSX.Element {
   const result = useStore((s) => s.result);
@@ -31,8 +34,13 @@ export function MetricsPanel(): JSX.Element {
   if (!result) {
     return (
       <section className={styles.wrap}>
-        <h3 className={styles.title}>Metrics</h3>
-        <EmptyState title="Run a search to see metrics" />
+        <div className={styles.titleRow}>
+          <h3 className={styles.title}>Metrics</h3>
+        </div>
+        <EmptyState
+          title="Run a search to see metrics"
+          subtitle="Choose a start location and a destination, then click Run Search."
+        />
       </section>
     );
   }
@@ -45,14 +53,15 @@ export function MetricsPanel(): JSX.Element {
           {copied ? "Copied" : "Copy"}
         </button>
       </div>
-      <dl className={`${styles.list}${busy ? ` ${styles.dim}` : ""}`}>
+      <ul className={`${styles.grid}${busy ? ` ${styles.dim}` : ""}`}>
         {rows.map((row) => (
-          <div key={row.key} className={styles.row}>
-            <dt className={styles.label}>{row.label}</dt>
-            <dd className={styles.value}>{row.value}</dd>
-          </div>
+          <li key={row.key} className={styles.card}>
+            <span className={styles.icon}>{row.icon}</span>
+            <span className={styles.cardLabel}>{row.label}</span>
+            <span className={styles.cardValue}>{row.value}</span>
+          </li>
         ))}
-      </dl>
+      </ul>
       <p className={styles.explanation}>{result.explanation}</p>
     </section>
   );

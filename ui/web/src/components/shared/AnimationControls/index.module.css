@@ -5,27 +5,36 @@
 }
 
 .btn {
-  width: 36px;
-  height: 36px;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
   display: flex;
   align-items: center;
   justify-content: center;
   background: var(--c-surface-2);
   border: none;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-md);
   color: var(--c-text-secondary);
   cursor: pointer;
-  transition: background 120ms ease-out, color 120ms ease-out;
+  transition:
+    background var(--motion-fast) var(--ease-default),
+    color var(--motion-fast) var(--ease-default),
+    transform var(--motion-fast) var(--ease-default),
+    box-shadow var(--motion-fast) var(--ease-default);
 }
 
 .btn:hover:not(:disabled) {
   color: var(--c-primary);
-  background: var(--c-surface-2);
+  background: var(--c-surface);
+  box-shadow: var(--shadow-1);
 }
 
 .btn:focus-visible {
   outline: none;
-  box-shadow: var(--shadow-focus);
+  box-shadow: var(--focus-ring);
+}
+
+.btn:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .btn:disabled {
@@ -42,4 +51,13 @@
 
 .btn.active:hover {
   background: var(--c-primary-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+  .btn:active:not(:disabled) {
+    transform: none;
+  }
 }
