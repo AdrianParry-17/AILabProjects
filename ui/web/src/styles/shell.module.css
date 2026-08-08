@@ -1,0 +1,109 @@
+/* App shell (UI_IMPLEMENTATION_PLAN.md §7 T04, LAYOUT_SPEC §3/§19). Five-region
+   layout: fixed header, 3-column body (left sidebar | center viz | right info
+   panel), docked bottom timeline. < 768 px renders a centered notice overlaying
+   the layout (out-of-scope per plan §2.4). */
+
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  min-height: 0;
+  background: var(--c-bg);
+}
+
+/* Header (LAYOUT_SPEC §5): 64 px, white, bottom border only. */
+.header {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: var(--header-height);
+  padding: 0 var(--space-24);
+  background: var(--c-surface);
+  border-bottom: var(--border-hairline) solid var(--c-border);
+}
+
+.brand {
+  font-size: var(--fs-subtitle);
+  font-weight: var(--fw-bold);
+  color: var(--c-text);
+}
+
+/* Body (LAYOUT_SPEC §3): three columns. Visualization column expands to fill
+   the remainder so it always remains the largest region (≥ 60% per §8). */
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.main {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+}
+
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  width: var(--info-panel-width);
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--c-surface);
+  border-left: var(--border-hairline) solid var(--c-border);
+}
+
+/* Bottom dock (LAYOUT_SPEC §16): 96–120 px, fixed. */
+.dock {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: var(--timeline-min-height);
+  max-height: var(--timeline-max-height);
+  padding: var(--space-12) var(--space-16);
+  background: var(--c-surface);
+  border-top: var(--border-hairline) solid var(--c-border);
+}
+
+/* Narrow viewport notice (LAYOUT_SPEC §19 / plan §2.4): overlay centered over
+   the existing layout when viewport < 768 px. Layout does not collapse below
+   768 px in this plan — the notice is informational. */
+.narrowNotice {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .narrowNotice {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: fixed;
+    inset: var(--space-16);
+    z-index: var(--z-modal);
+    margin: auto;
+    height: max-content;
+    padding: var(--space-24);
+    background: var(--c-surface);
+    border: var(--border-hairline) solid var(--c-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-3);
+    color: var(--c-text);
+    font-size: var(--fs-body);
+    font-weight: var(--fw-medium);
+    text-align: center;
+  }
+}
+
+/* Laptop 1024–1439: narrower right panel. */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .rightPanel {
+    width: var(--info-panel-width-narrow);
+  }
+}
+
+/* Tablet 768–1023: sidebar collapses to drawer. The Sidebar component owns
+   the responsive drawer behavior; the shell just keeps the columns intact. */

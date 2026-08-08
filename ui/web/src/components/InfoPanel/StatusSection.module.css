@@ -1,0 +1,75 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  min-height: var(--control-height-sm);
+}
+
+.dot {
+  width: var(--node-sm);
+  height: var(--node-sm);
+  border-radius: var(--radius-full);
+  background: var(--c-border-strong, var(--c-text-secondary));
+  flex: none;
+}
+
+.dot[data-state="Ready"],
+.dot[data-state="Finished"] {
+  background: var(--c-success);
+}
+
+.dot[data-state="Playing"],
+.dot[data-state="Paused"] {
+  background: var(--c-primary);
+}
+
+.dot[data-state="Error"] {
+  background: var(--c-danger);
+}
+
+.dot[data-state="Replay"] {
+  background: var(--c-warning);
+}
+
+.text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--fs-small);
+  color: var(--c-text);
+}
+
+.mock {
+  font-size: var(--fs-caption);
+  font-weight: var(--fw-medium);
+  color: var(--c-warning);
+  background: var(--c-surface-2);
+  border-radius: var(--radius-sm);
+  padding: var(--space-4) var(--space-8);
+  flex: none;
+}
+
+.retry {
+  margin-left: auto;
+  height: var(--control-height-sm);
+  padding: 0 var(--space-8);
+  border: var(--border-hairline) solid var(--c-border);
+  border-radius: var(--radius-sm);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: var(--fs-caption);
+  cursor: pointer;
+  transition:
+    background var(--motion-very-fast) var(--ease-default),
+    border-color var(--motion-very-fast) var(--ease-default);
+}
+
+.retry:hover {
+  background: var(--c-surface-2);
+}
+
+.retry:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}

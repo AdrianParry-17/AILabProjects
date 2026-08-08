@@ -1,0 +1,36 @@
+.sidebar {
+  width: var(--sidebar-width);
+  flex: none;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  padding: var(--space-16);
+  background: var(--c-surface);
+  border-right: var(--border-hairline) solid var(--c-border);
+}
+
+/* Tablet 768–1023 (LAYOUT_SPEC §19): sidebar collapses to a left-anchored
+   drawer above the body (z above visualization). Reduced-motion respects
+   the open/close slide+fade animation. */
+@media (max-width: 1023px) {
+  .sidebar {
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    bottom: var(--timeline-min-height);
+    width: min(var(--sidebar-width), 88vw);
+    z-index: var(--z-sidebar-overlay);
+    box-shadow: var(--shadow-2);
+    transition:
+      transform var(--motion-normal) var(--ease-panel),
+      opacity var(--motion-normal) var(--ease-panel);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar {
+    transition: none;
+  }
+}

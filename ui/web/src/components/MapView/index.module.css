@@ -1,0 +1,137 @@
+/* MapView (UI_IMPLEMENTATION_PLAN §7 T11–T13). Consumes only design tokens;
+   no ad-hoc colors/spacings/radii/durations. */
+
+.overlayWrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--c-surface-2);
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-canvas);
+}
+
+/* Loading skeleton (spec §22): gradient shimmer, never a blank white pane. */
+.skeletonMap {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-canvas);
+  background:
+    linear-gradient(
+      120deg,
+      var(--c-surface-2) 0%,
+      var(--c-surface) 40%,
+      var(--c-surface-2) 60%,
+      var(--c-surface-2) 100%
+    );
+  background-size: 200% 100%;
+  animation: shimmer var(--motion-slow) var(--ease-linear) infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+  100% {
+    background-position: -20% 0;
+  }
+}
+
+/* Floating top-right controls () */
+.controls {
+  position: absolute;
+  top: var(--space-12);
+  right: var(--space-12);
+  z-index: var(--z-tooltip);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  pointer-events: auto;
+}
+
+.control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  padding: 0 var(--space-8);
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: var(--fs-small);
+  font-weight: var(--fw-medium);
+  border: var(--border-hairline) solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.control:hover {
+  background: var(--c-surface-2);
+}
+
+.control:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* Hover tooltip anchor (positioned by container-point coordinates). */
+.hoverAnchor {
+  position: absolute;
+  z-index: var(--z-tooltip);
+  pointer-events: none;
+  transform: translate(-50%, -110%);
+}
+
+/* ---- Leaflet path overlays (T12) ---- */
+
+.routeGlow path {
+  filter: drop-shadow(0 0 4px var(--color-info-300));
+}
+
+/* Persistent start/goal pins (config-style DOM the Leaflet divIcon adds). */
+.startPin,
+.goalPin {
+  background: transparent;
+  border: none;
+}
+
+.pin {
+  display: block;
+  width: var(--icon-lg);
+  height: var(--icon-lg);
+  border-radius: var(--radius-full);
+  box-shadow:
+    inset 0 0 0 2px var(--c-surface),
+    0 0 0 2px var(--c-surface),
+    var(--shadow-2);
+}
+
+.startPin .pin {
+  background: var(--c-start);
+}
+
+.goalPin .pin {
+  background: var(--c-goal);
+}
+
+.current path {
+  filter: drop-shadow(0 0 6px rgb(43 134 183 / 0.35));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonMap {
+    animation: none;
+  }
+
+  .routeGlow path,
+  .current path {
+    filter: none;
+  }
+}

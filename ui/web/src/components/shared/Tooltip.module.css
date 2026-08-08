@@ -1,0 +1,78 @@
+/* Shared Tooltip (UI_TASK_BREAKDOWN §7 T13, MAP_RENDERING_SPEC §16,
+   MOTION_SPEC §17): token-driven card, 100 ms fade + 2 px translateY,
+   max-width 300 px, rounded, shadowed. Never scales. */
+
+.host {
+  position: relative;
+  display: inline-block;
+}
+
+.tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: var(--space-8);
+  padding: var(--space-8) var(--space-12);
+  min-width: var(--space-96);
+  max-width: 300px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: var(--fs-caption);
+  line-height: var(--lh-caption);
+  border: var(--border-hairline) solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  text-align: left;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-very-fast) var(--ease-default),
+    transform var(--motion-very-fast) var(--ease-default);
+  transform: translateX(-50%) translateY(2px);
+}
+
+.host:hover .tooltip,
+.host:focus-within .tooltip,
+.tooltip[data-open="true"] {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.title {
+  display: block;
+  font-weight: var(--fw-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.line {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-16);
+}
+
+.lineLabel {
+  color: var(--c-text-muted);
+  white-space: nowrap;
+}
+
+.lineValue {
+  color: var(--c-text);
+  word-break: break-all;
+  max-width: 180px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    transition: none;
+  }
+}

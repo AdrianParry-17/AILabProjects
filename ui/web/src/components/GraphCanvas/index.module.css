@@ -1,0 +1,271 @@
+/* GraphCanvas — UI_IMPLEMENTATION_PLAN §7 T09, LAYOUT_SPEC §8/§23, MAP_RENDERING §8–15.
+   Token-driven; no literal colors, durations or easing in this file. */
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--c-surface);
+  touch-action: none;
+}
+
+.wrap {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+/* Static backdrop (LAYOUT_SPEC §9 — neutral gray for graph). */
+.basePlate {
+  fill: var(--c-bg);
+}
+
+/* ----- Static layers (memoised; never re-render per playback step). ----- */
+
+.edgesLayer {
+  pointer-events: none;
+}
+
+.edge {
+  fill: none;
+  stroke: var(--c-edge);
+  stroke-width: 1.5;
+}
+
+.nodesLayer {
+  cursor: pointer;
+}
+
+.nodeGroup {
+  outline: none;
+}
+
+.nodeGroup:focus-visible {
+  outline: 2px dashed var(--c-selected);
+  outline-offset: 2px;
+}
+
+/* Node visual states (see DESIGN_TOKENS §5: visited=Success, current=Info,
+   frontier=Primary, start=Success, goal=Danger, path=Warning, selected=Primary).
+   Eight states: normal / start / goal / visited / current / path / frontier / selected. */
+.node {
+  fill: var(--c-node-base);
+  stroke: var(--c-node-stroke);
+  stroke-width: 1.5;
+}
+
+.nodeStart {
+  stroke: var(--c-start);
+  stroke-width: 2;
+}
+
+.nodeGoal {
+  stroke: var(--c-goal);
+  stroke-width: 2;
+}
+
+.nodePath {
+  fill: var(--c-route);
+  stroke: var(--c-surface);
+  stroke-width: 1.5;
+}
+
+.nodeSelected {
+  stroke: var(--c-selected);
+  stroke-width: 2.5;
+}
+
+.nodeGroup:hover .node {
+  stroke: var(--c-edge-hover);
+}
+
+/* ----- Animation layers (RouteOverlay — re-renders per playback step). ----- */
+
+.overlayLayer {
+  pointer-events: none;
+}
+
+.visitedEdge {
+  fill: none;
+  stroke: var(--c-visited);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+.currentEdge {
+  fill: none;
+  stroke: var(--c-current);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+.routeHalo {
+  stroke: var(--c-route-halo);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.route {
+  stroke: var(--c-route);
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.visitedMark {
+  fill: var(--c-visited);
+  stroke: var(--c-surface);
+  stroke-width: 1;
+}
+
+.frontierMark {
+  fill: var(--c-frontier);
+  stroke: var(--c-surface);
+  stroke-width: 1.5;
+}
+
+.currentMark {
+  fill: var(--c-current);
+  stroke: var(--c-surface);
+  stroke-width: 2.5;
+}
+
+.pathMark {
+  fill: var(--c-route);
+  stroke: var(--c-surface);
+  stroke-width: 1.5;
+}
+
+.gatewayMark {
+  pointer-events: none;
+}
+
+.gatewayRing,
+.gatewayRingGoal {
+  fill: none;
+  stroke-width: 3;
+}
+
+.gatewayRing {
+  stroke: var(--c-start);
+}
+
+.gatewayRingGoal {
+  stroke: var(--c-goal);
+}
+
+.gatewayCore {
+  fill: var(--c-start);
+}
+
+.gatewayCoreGoal {
+  fill: var(--c-goal);
+}
+
+/* ----- Floating controls (LAYOUT_SPEC §16, MAP_RENDERING §6).
+   Top-right: +, –, Fit. Keyboard accessible; reduced-motion respected. */
+
+.controls {
+  position: absolute;
+  top: var(--space-8);
+  right: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  z-index: var(--z-canvas);
+}
+
+.control {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-surface);
+  border: var(--border-hairline) solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  font-size: var(--fs-small);
+  color: var(--c-text);
+  transition:
+    background var(--motion-very-fast) var(--ease-default),
+    border-color var(--motion-very-fast) var(--ease-default);
+}
+
+.control:hover {
+  background: var(--c-surface-2);
+}
+
+.control:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .control {
+    transition: none;
+  }
+}
+
+/* ----- Legend (LAYOUT_SPEC §4, COMPONENT_POLISH §3.4) ----- */
+
+.legend {
+  position: absolute;
+  left: var(--space-8);
+  bottom: var(--space-8);
+  z-index: var(--z-canvas);
+  margin: 0;
+  padding: var(--space-8) var(--space-12);
+  display: flex;
+  gap: var(--space-16);
+  list-style: none;
+  background: var(--c-surface);
+  border: var(--border-hairline) solid var(--c-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-1);
+  font-size: var(--fs-caption);
+  color: var(--c-text-secondary);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.legendSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  display: inline-block;
+}
+
+.legendSwatchStart {
+  background: var(--c-start);
+}
+
+.legendSwatchGoal {
+  background: var(--c-goal);
+}
+
+.legendSwatchCurrent {
+  background: var(--c-current);
+}
+
+.legendSwatchFrontier {
+  background: var(--c-frontier);
+}
+
+.legendSwatchVisited {
+  background: var(--c-visited);
+}
+
+.legendSwatchRoute {
+  background: var(--c-route);
+}

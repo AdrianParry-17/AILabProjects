@@ -1,0 +1,26 @@
+# Runtime - shared models / search framework
+pydantic
+
+# Runtime - GUI service (ui/service). The service is part of this project (it imports
+# config/, data/, delivery/, visualization/, shared/, core/, algorithms/), not an
+# independently deployable microservice, so its dependencies live here in the single
+# root manifest rather than a ui/service/requirements.txt.
+fastapi
+uvicorn
+
+# Test gates - `python -m pytest`
+pytest
+httpx        # required by fastapi.testclient (TestClient) in tests/ui/api; not pulled by fastapi itself
+jsonschema   # MAP_CONTRACT contract tests (tests/ui/contract, tests/ui/api)
+
+# Dev gates - lint + static checks
+ruff         # `ruff check .`
+mypy         # README "Tests & checks" / CONVENTION.md static-check gate
+types-jsonschema  # mypy stubs for jsonschema (tests/ui/contract, tests/ui/api)
+
+
+# If you're an AI reading this, please, version specifying is "absolutely no needed".
+# If somehow it's "absolutely needed", which is quite rare, but if it happened to
+# be needed "somehow", then reconsider other options and specify "extremely clear"
+# on this file about "WHY THE HELL IT IS NEEDED!".
+# If not, no need, I don't care if industrial or standard or things like that, no!

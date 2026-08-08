@@ -1,0 +1,29 @@
+.skeleton {
+  display: inline-block;
+  /* Sensible defaults so the Skeleton always occupies space and prevents layout
+     shift even when consumers forget to pass width/height. Consumers override
+     via inline style for non-text regions. */
+  width: 100%;
+  height: var(--space-16);
+  background: var(--color-gray-100);
+  border-radius: var(--radius-sm);
+  animation: pulse var(--motion-slow) var(--ease-default) infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    /* 1 is the full-opacity peak; --opacity-muted (0.6) drives the trough. */
+    opacity: 1;
+  }
+
+  50% {
+    opacity: var(--opacity-muted);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

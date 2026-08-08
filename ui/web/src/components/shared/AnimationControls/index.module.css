@@ -1,0 +1,45 @@
+.cluster {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.btn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-surface-2);
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--c-text-secondary);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+
+.btn:hover:not(:disabled) {
+  color: var(--c-primary);
+  background: var(--c-surface-2);
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: var(--shadow-focus);
+}
+
+.btn:disabled {
+  color: var(--c-text-muted, var(--c-text-secondary));
+  background: var(--c-surface-2);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn.active {
+  color: var(--c-surface);
+  background: var(--c-primary);
+}
+
+.btn.active:hover {
+  background: var(--c-primary-hover);
+}

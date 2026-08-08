@@ -1,0 +1,29 @@
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  color: currentColor;
+}
+
+.sm {
+  --icon-size: var(--icon-sm);
+}
+
+.md {
+  --icon-size: var(--icon-md);
+}
+
+.lg {
+  --icon-size: var(--icon-lg);
+}
+
+.xl {
+  --icon-size: var(--icon-xl);
+}
+
+.icon,
+.icon svg {
+  width: var(--icon-size);
+  height: var(--icon-size);
+}
