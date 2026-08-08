@@ -1,10 +1,10 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { DeliveryNode, SearchResult } from "../../api/types";
 import { frameAt } from "../../services/animation";
 import { useStore } from "../../state/store";
-import { MapView } from "./index";
+import { MapView, resolveHoverPoint } from "./index";
 
 const NODES: DeliveryNode[] = [
   { id: "a", name: "Alpha", latitude: 10.8, longitude: 106.69, kind: "delivery_supermarket", attributes: {} },
@@ -115,5 +115,107 @@ describe("MapView (P3 T11-T13)", () => {
     expect(useStore.getState().playing).toBe(false);
     expect(useStore.getState().result).toBe(RESULT);
     expect(useStore.getState().start).toBe("a");
+  });
+
+  it("keeps the map host mounted through search Loading→Ready (no orphaned Leaflet instance)", () => {
+    seedReady();
+    render(<MapView />);
+    const hostBefore = screen.getByTestId("map-canvas");
+
+    act(() => useStore.setState({ status: "Loading" }));
+    expect(screen.getByTestId("map-skeleton")).toBeInTheDocument();
+    const hostDuring = screen.getByTestId("map-canvas");
+    expect(hostDuring).toBe(hostBefore);
+
+    act(() => useStore.setState({ status: "Ready" }));
+    const hostAfter = screen.getByTestId("map-canvas");
+    expect(hostAfter).toBe(hostBefore);
+  });
+
+  it("keeps the map host mounted through Error and retry recovery (F1)", () => {
+    seedReady();
+    render(<MapView />);
+    const hostBefore = screen.getByTestId("map-canvas");
+
+    act(() => useStore.setState({ status: "Error", error: "boom" }));
+    const errorOverlay = screen.getByTestId("map-error");
+    expect(errorOverlay).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(screen.getByTestId("map-canvas")).toBe(hostBefore);
+
+    act(() => useStore.setState({ status: "Ready", error: null }));
+    expect(screen.queryByTestId("map-error")).toBeNull();
+    expect(screen.getByTestId("map-canvas")).toBe(hostBefore);
+    expect(screen.getByTestId("map-overlays")).toBeInTheDocument();
+  });
+
+  it("shows only a skeleton before a graph exists, and keeps search results across Loading flips", () => {
+    act(() =>
+      useStore.setState({
+        status: "Loading",
+        graph: null,
+        result: RESULT,
+        activeIndex: 1,
+      }),
+    );
+    render(<MapView />);
+    expect(screen.getByTestId("map-skeleton")).toBeInTheDocument();
+    expect(screen.queryByTestId("map-canvas")).toBeNull();
+
+    // Search-style status flip: Loading → Ready must not reset search state.
+    act(() =>
+      useStore.setState({
+        status: "Ready",
+        graph: { nodes: NODES, edges: [], bbox: [10.78, 106.69, 10.8, 106.71] },
+      }),
+    );
+    expect(useStore.getState().result).toBe(RESULT);
+    expect(useStore.getState().activeIndex).toBe(1);
+    const overlays = screen.getByTestId("map-overlays");
+    const expected = frameAt(RESULT.steps, 1);
+    expect(overlays.getAttribute("data-visited")).toBe(expected.visitedIds.join(","));
+  });
+
+  it("exposes a keyboard-reachable node list that selects the same node as a marker click", () => {
+    seedReady();
+    render(<MapView />);
+    const row = screen.getByRole("button", { name: /Alpha/i });
+    fireEvent.click(row);
+    expect(useStore.getState().selectedNode).toBe("a");
+    expect(row.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("keeps the node list wired to the same popup/selection path as markers", () => {
+    seedReady();
+    render(<MapView />);
+    fireEvent.click(screen.getByRole("button", { name: /Beta/i }));
+    expect(useStore.getState().selectedNode).toBe("b");
+  });
+});
+
+describe("resolveHoverPoint (T13/F8)", () => {
+  const NODE: DeliveryNode = {
+    id: "n",
+    name: "N",
+    latitude: 10.8,
+    longitude: 106.69,
+    kind: "delivery_market",
+    attributes: {},
+  };
+
+  it("prefers the explicit Leaflet container point when provided", () => {
+    expect(resolveHoverPoint(null, NODE, { x: 3, y: 4 })).toEqual({ x: 3, y: 4 });
+  });
+
+  it("derives the anchor from node coordinates when the marker passed none (pins/current)", () => {
+    const view = {
+      map: { latLngToContainerPoint: () => ({ x: 17, y: 29 }) },
+    } as unknown as Parameters<typeof resolveHoverPoint>[0];
+    expect(resolveHoverPoint(view, NODE, null)).toEqual({ x: 17, y: 29 });
+  });
+
+  it("returns null when there is no anchor to derive", () => {
+    expect(resolveHoverPoint(null, NODE, null)).toBeNull();
+    expect(resolveHoverPoint(null, null, null)).toBeNull();
   });
 });

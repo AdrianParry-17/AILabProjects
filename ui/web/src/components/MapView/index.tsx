@@ -9,9 +9,10 @@ import { Button } from "../shared/Button";
 import { EmptyState } from "../shared/EmptyState";
 import { Popup, type PopupNode } from "../shared/Popup";
 import { Tooltip } from "../shared/Tooltip";
+import { NodeListFallback } from "../GraphCanvas/NodeListFallback";
 import { MapOverlays } from "./Overlays";
 import { useFrameSync } from "./useFrameSync";
-import { useLeaflet } from "./useLeaflet";
+import { useLeaflet, type MapInstance } from "./useLeaflet";
 import styles from "./index.module.css";
 
 /**
@@ -22,11 +23,35 @@ import styles from "./index.module.css";
  * Switching renderers is a store change; mounting/unmounting never reruns
  * search nor resets playback.
  *
+ * Lifecycle (T11): once a graph exists the Leaflet container stays mounted
+ * across Loading/Ready/Error — search, retry and error recovery overlay the
+ * map instead of destroying it, so the `useLeaflet` instance never orphanes
+ * on a detached DOM node.
+ *
  * Interactions: leaflet-native wheel zoom, drag, double-click zoom, touch
- * pinch, keyboard; floating controls: +, −, Fit, Locate Graph.
+ * pinch, keyboard; floating controls: +, −, Fit, Locate Graph; keyboard
+ * accessible node list (shared NodeListFallback).
  * Camera: initial fit of the graph bounds (40 px padding), clamped to
  * [10, 18]; the camera survives renderer switches via `useLeaflet`'s cache.
  */
+
+/**
+ * Tooltip anchor resolution (T13/F8): markers report the hover point when
+ * Leaflet provides one; pins and the current node call back with `null`, so
+ * the anchor is derived from the node's container position. Pure — no Leaflet
+ * instance is required until the call.
+ */
+export function resolveHoverPoint(
+  view: MapInstance | null,
+  node: DeliveryNode | null,
+  point: { x: number; y: number } | null,
+): { x: number; y: number } | null {
+  if (point) return point;
+  if (!view || !node) return null;
+  const p = view.map.latLngToContainerPoint([node.latitude, node.longitude]);
+  return { x: p.x, y: p.y };
+}
+
 export function MapView(): JSX.Element {
   const status = useStore((s) => s.status);
   const error = useStore((s) => s.error);
@@ -39,6 +64,7 @@ export function MapView(): JSX.Element {
   const setGoal = useStore((s) => s.setGoal);
   const selectNode = useStore((s) => s.selectNode);
   const setHoveredNode = useStore((s) => s.setHoveredNode);
+  const selectedNode = useStore((s) => s.selectedNode);
   const loadGraph = useStore((s) => s.loadGraph);
 
   const frame = useFrameSync(result, activeIndex);
@@ -109,14 +135,15 @@ export function MapView(): JSX.Element {
     (id: string | null, point: { x: number; y: number } | null) => {
       setHoveredNode(id);
       if (id) {
-        setHoverNode(nodesById.get(id) ?? null);
-        setHoverPoint(point);
+        const node = nodesById.get(id) ?? null;
+        setHoverNode(node);
+        setHoverPoint(resolveHoverPoint(view, node, point));
       } else {
         setHoverNode(null);
         setHoverPoint(null);
       }
     },
-    [nodesById, setHoveredNode],
+    [nodesById, setHoveredNode, view],
   );
 
   const centerHere = useCallback(() => {
@@ -143,14 +170,16 @@ export function MapView(): JSX.Element {
     return { left: point.x, top: point.y, transform: "translate(-50%, -115%)" };
   }, [view, popupNode]);
 
-  if (status === "Loading") {
+  // Before any graph exists the map host cannot be created (no bounds):
+  // Loading shows a skeleton, everything else shows the shared EmptyState.
+  if (status === "Loading" && !graph) {
     return (
       <div className={styles.overlayWrap} data-testid="map-view">
         <div className={styles.skeletonMap} data-testid="map-skeleton" aria-busy="true" />
       </div>
     );
   }
-  if (!graph || status === "Error") {
+  if (!graph) {
     return (
       <div className={styles.overlayWrap} data-testid="map-view">
         <EmptyState
@@ -165,11 +194,13 @@ export function MapView(): JSX.Element {
   const startId = result && result.path.length > 0 ? result.path[0] : start;
   const goalId = result && result.path.length > 1 ? result.path[result.path.length - 1] : goal;
 
+  // Loading (search/retry) and pre-tile states overlay the map instead of
+  // unmounting the Leaflet host — the container must stay mounted so the
+  // useLeaflet instance is never orphaned on a detached node (T11 lifecycle).
+  const showSkeleton = !tilesLoaded || status === "Loading";
+
   return (
     <div className={styles.overlayWrap} data-testid="map-view">
-      {!tilesLoaded ? (
-        <div className={styles.skeletonMap} data-testid="map-skeleton" aria-busy="true" />
-      ) : null}
       <div
         ref={containerRef}
         className={styles.map}
@@ -204,6 +235,10 @@ export function MapView(): JSX.Element {
           </button>
         </div>
       ) : null}
+      {/* Keyboard-reachable node proxy (T13/F5): same rows/actions as the
+          Graph renderer's fallback list; clicking a row selects + opens the
+          same Popup as a marker click. */}
+      <NodeListFallback nodes={graph.nodes} selectedId={selectedNode} onSelect={onMarkerClick} />
       {hoverNode && hoverPoint && view ? (
         <div className={styles.hoverAnchor} style={{ left: hoverPoint.x, top: hoverPoint.y }}>
           <Tooltip
@@ -235,6 +270,18 @@ export function MapView(): JSX.Element {
           onCenter={centerHere}
           onClose={() => setPopupNode(null)}
         />
+      ) : null}
+      {showSkeleton ? (
+        <div className={styles.skeletonMap} data-testid="map-skeleton" aria-busy="true" />
+      ) : null}
+      {status === "Error" ? (
+        <div className={styles.errorDim} data-testid="map-error" role="status">
+          <EmptyState
+            title="Graph load failed"
+            subtitle={error ?? "Could not load graph data."}
+            action={<Button onClick={() => void loadGraph()}>Retry</Button>}
+          />
+        </div>
       ) : null}
     </div>
   );

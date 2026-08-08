@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import L from "leaflet";
 
 import type { DeliveryEdge, DeliveryNode } from "../../api/types";
@@ -120,10 +120,18 @@ export function MapOverlays({
     };
   }, [map, edges, nodes]);
 
+  /** Current node id of the previous frame — a change means the current node
+   *  was just entered and its entry pulse may fire once (MOTION_SPEC §18:
+   *  pulse fires once on entry, never infinite). */
+  const prevCurrentIdRef = useRef<string | null>(null);
+
   /** Per-frame animated layers: progressive route, visited, current. */
   useEffect(() => {
     if (!map) return;
     const layer = L.layerGroup().addTo(map.map);
+
+    const justEntered = prevCurrentIdRef.current !== currentId;
+    prevCurrentIdRef.current = currentId;
 
     const routeIds = routeLen > 0 ? path!.slice(0, routeLen) : [];
     if (routeIds.length > 1) {
@@ -176,9 +184,22 @@ export function MapOverlays({
     if (currentId) {
       const node = nodes.get(currentId);
       if (node) {
-        L.circleMarker([node.latitude, node.longitude], {
+        const currentPos: [number, number] = [node.latitude, node.longitude];
+        if (justEntered) {
+          L.circleMarker(currentPos, {
+            radius: 8,
+            stroke: false,
+            fill: true,
+            fillColor: tokenColor("--color-info-500", "#2b86b7"),
+            fillOpacity: 0.7,
+            interactive: false,
+            className: styles.pulseHalo,
+            renderer: sharedSvg,
+          }).addTo(layer);
+        }
+        L.circleMarker(currentPos, {
           radius: 8,
-          color: "#ffffff",
+          color: tokenColor("--c-surface", "#ffffff"),
           weight: 3,
           fillColor: tokenColor("--color-info-500", "#2b86b7"),
           fillOpacity: 1,

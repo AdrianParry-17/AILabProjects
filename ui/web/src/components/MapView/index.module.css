@@ -16,29 +16,24 @@
   z-index: var(--z-canvas);
 }
 
-/* Loading skeleton (spec §22): gradient shimmer, never a blank white pane. */
+/* Loading skeleton (spec §22): static surface, one-shot fade, never a blank
+   white pane. No infinite shimmer — MOTION_SPEC §7 forbids animated
+   gradients/background movement; reduced motion disables the fade (§20). */
 .skeletonMap {
   position: absolute;
   inset: 0;
   z-index: var(--z-canvas);
-  background:
-    linear-gradient(
-      120deg,
-      var(--c-surface-2) 0%,
-      var(--c-surface) 40%,
-      var(--c-surface-2) 60%,
-      var(--c-surface-2) 100%
-    );
-  background-size: 200% 100%;
-  animation: shimmer var(--motion-slow) var(--ease-linear) infinite;
+  background: var(--c-surface-2);
+  pointer-events: none;
+  animation: skeletonFadeIn var(--motion-normal) var(--ease-default) 1;
 }
 
-@keyframes shimmer {
+@keyframes skeletonFadeIn {
   0% {
-    background-position: 120% 0;
+    opacity: 0;
   }
   100% {
-    background-position: -20% 0;
+    opacity: 1;
   }
 }
 
@@ -89,6 +84,19 @@
   transform: translate(-50%, -110%);
 }
 
+/* Error state (MAP_RENDERING_SPEC §21): the map stays mounted and dims
+   while the error card appears centered. Background = gray-900 at 35 %
+   (token value rgb(23 32 42) == --c-text / --color-gray-900). */
+.errorDim {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-tooltip);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgb(23 32 42 / 0.35);
+}
+
 /* ---- Leaflet path overlays (T12) ---- */
 
 .routeGlow path {
@@ -121,8 +129,27 @@
   background: var(--c-goal);
 }
 
-.current path {
-  filter: drop-shadow(0 0 6px rgb(43 134 183 / 0.35));
+/* One-shot current-node entry pulse (T12, MOTION_SPEC §18): a halo ring that
+   scales + fades exactly once when the current node changes over. The ring is
+   created only on the entry frame (Overlays.tsx) — when the animation has
+   run it returns to its static `opacity: 0` state, so it never loops or
+   re-fires, and reduced motion keeps it invisible. */
+.pulseHalo path {
+  opacity: 0;
+  animation: nodePulse var(--motion-slow) var(--ease-default) 1;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes nodePulse {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2.1);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -130,8 +157,11 @@
     animation: none;
   }
 
-  .routeGlow path,
-  .current path {
+  .pulseHalo path {
+    animation: none;
+  }
+
+  .routeGlow path {
     filter: none;
   }
 }
