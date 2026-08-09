@@ -40,7 +40,7 @@
 .btn:disabled {
   color: var(--c-text-muted, var(--c-text-secondary));
   background: var(--c-surface-2);
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 

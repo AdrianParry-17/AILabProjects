@@ -61,7 +61,7 @@
 }
 
 .slider:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 
@@ -70,7 +70,7 @@
   -webkit-appearance: none;
   width: var(--icon-md);
   height: var(--icon-md);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--c-primary);
   border: var(--border-strong) solid var(--c-surface);
   box-shadow: var(--shadow-2);
@@ -81,14 +81,15 @@
 .slider::-moz-range-thumb {
   width: var(--icon-md);
   height: var(--icon-md);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--c-primary);
   border: var(--border-strong) solid var(--c-surface);
   cursor: pointer;
 }
 
 .slider:active::-webkit-slider-thumb {
-  transform: scale(1.1);
+  /* MOTION_SPEC §6: only scale 0.98 → 1 is allowed — pressed affine feedback. */
+  transform: scale(0.98);
 }
 
 .slider:focus-visible {

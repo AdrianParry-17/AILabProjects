@@ -86,6 +86,25 @@ describe("AlgorithmSelector", () => {
     expect(document.activeElement).toBe(trigger);
   });
 
+  it("selects the highlighted algorithm with Enter from the search input and restores focus to the trigger", () => {
+    const onChange = vi.fn();
+    render(<AlgorithmSelector catalog={CATALOG} value="bfs" onChange={onChange} />);
+    const trigger = screen.getByRole("combobox");
+    fireEvent.click(trigger);
+    const search = screen.getByPlaceholderText(/Search algorithms/i);
+    search.focus();
+    expect(document.activeElement).toBe(search);
+    // Filter to a single result; ArrowDown keeps the highlight index in range.
+    fireEvent.change(search, { target: { value: "cost" } });
+    fireEvent.keyDown(search, { key: "ArrowDown" });
+    fireEvent.keyDown(search, { key: "Enter" });
+    // Selection happened, the dropdown closed, and focus returned to the trigger
+    // (the unmounting search input must not strand focus on <body>).
+    expect(onChange).toHaveBeenCalledWith("ucs");
+    expect(screen.queryByPlaceholderText(/Search algorithms/i)).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   it("keeps the trigger aria-expanded / aria-controls / listbox semantics intact across open + close", () => {
     render(<AlgorithmSelector catalog={CATALOG} value="bfs" onChange={() => {}} />);
     const trigger = screen.getByRole("combobox");

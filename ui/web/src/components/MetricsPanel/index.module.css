@@ -60,7 +60,7 @@
 }
 
 .dim {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
 }
 
 @media (max-width: 1023px) {

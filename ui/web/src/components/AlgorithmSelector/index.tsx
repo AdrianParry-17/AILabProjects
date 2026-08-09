@@ -84,8 +84,13 @@ export function AlgorithmSelector({
       setHighlight((h) => (h - 1 + count) % count);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (open && filtered[highlight]) select(filtered[highlight].id, false);
-      else setOpen(true);
+      if (open && filtered[highlight]) {
+        // Selecting via Enter from the search input must return focus to
+        // the trigger — the input unmounts on close and focus would
+        // otherwise fall to <body> (same rule as Escape/mouse selection).
+        const returnFocus = searchRef.current?.matches(":focus") ?? false;
+        select(filtered[highlight].id, returnFocus);
+      } else setOpen(true);
     } else if (e.key === "Escape") {
       e.preventDefault();
       // Restore focus to the trigger when closing from the search input —
