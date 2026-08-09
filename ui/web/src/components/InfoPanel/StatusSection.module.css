@@ -9,26 +9,31 @@
   width: var(--node-sm);
   height: var(--node-sm);
   border-radius: var(--radius-full);
-  background: var(--c-border-strong, var(--c-text-secondary));
+  background: var(--c-status-idle);
   flex: none;
+  transition: background-color var(--motion-very-fast) var(--ease-default);
+}
+
+.dot[data-state="Loading"] {
+  background: var(--c-status-loading);
 }
 
 .dot[data-state="Ready"],
 .dot[data-state="Finished"] {
-  background: var(--c-success);
+  background: var(--c-status-completed);
 }
 
 .dot[data-state="Playing"],
 .dot[data-state="Paused"] {
-  background: var(--c-primary);
+  background: var(--c-status-running);
 }
 
 .dot[data-state="Error"] {
-  background: var(--c-danger);
+  background: var(--c-status-failed);
 }
 
 .dot[data-state="Replay"] {
-  background: var(--c-warning);
+  background: var(--c-status-warning);
 }
 
 .text {
@@ -72,4 +77,11 @@
 .retry:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot,
+  .retry {
+    transition: none;
+  }
 }

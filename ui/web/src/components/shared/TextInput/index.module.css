@@ -56,3 +56,9 @@
   font-size: var(--fs-caption);
   color: var(--c-danger);
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .input {
+    transition: none;
+  }
+}

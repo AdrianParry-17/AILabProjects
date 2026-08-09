@@ -57,3 +57,9 @@
   color: var(--c-text-secondary);
   cursor: not-allowed;
 }
+
+@media (prefers-reduced-motion: reduce) {
+  .run {
+    transition: none;
+  }
+}

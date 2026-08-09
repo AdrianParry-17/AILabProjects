@@ -93,7 +93,7 @@
   height: 64px;
   border-radius: var(--radius-sm);
   background: var(--c-surface-2);
-  animation: pulse 1.2s ease-in-out infinite;
+  animation: pulse var(--motion-slow) var(--ease-default) infinite;
 }
 
 @keyframes pulse {
@@ -103,5 +103,12 @@
   }
   50% {
     opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeletonRow {
+    animation: none;
+    opacity: 1;
   }
 }
