@@ -1,4 +1,4 @@
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useRef, useState } from "react";
 
 import type { AlgorithmSummary } from "../../api/types";
 import { Badge } from "../shared/Badge";
@@ -14,7 +14,7 @@ interface AlgorithmSelectorProps {
 /** Sim (mock) provider glyph — decorative. */
 function SimIcon(): JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <path d="M9 3h6v4l4 5a2 2 0 0 1-2 3H7a2 2 0 0 1-2-3l4-5V3Z" strokeLinejoin="round" />
       <path d="M7 21h10" strokeLinecap="round" />
     </svg>
@@ -24,7 +24,7 @@ function SimIcon(): JSX.Element {
 /** Real provider glyph — decorative. */
 function RealIcon(): JSX.Element {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
       <circle cx="12" cy="12" r="8" />
       <path d="m8 12 3 3 5-6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
@@ -47,6 +47,8 @@ export function AlgorithmSelector({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const [query, setQuery] = useState("");
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const selected = catalog.find((a) => a.id === value) ?? null;
 
@@ -56,13 +58,20 @@ export function AlgorithmSelector({
     return catalog.filter((a) => a.label.toLowerCase().includes(q));
   }, [catalog, query]);
 
-  function select(id: string): void {
+  function closeDropdown(returnFocus: boolean): void {
+    setOpen(false);
+    setQuery("");
+    if (returnFocus) triggerRef.current?.focus();
+  }
+
+  function select(id: string, returnFocus: boolean): void {
     onChange(id);
     setOpen(false);
     setQuery("");
+    if (returnFocus) triggerRef.current?.focus();
   }
 
-  function onKeyDown(e: React.KeyboardEvent<HTMLButtonElement>): void {
+  function onKeyDown(e: React.KeyboardEvent<HTMLButtonElement | HTMLInputElement>): void {
     if (disabled) return;
     const count = Math.max(filtered.length, 1);
     if (e.key === "ArrowDown") {
@@ -75,11 +84,15 @@ export function AlgorithmSelector({
       setHighlight((h) => (h - 1 + count) % count);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (open && filtered[highlight]) select(filtered[highlight].id);
+      if (open && filtered[highlight]) select(filtered[highlight].id, false);
       else setOpen(true);
     } else if (e.key === "Escape") {
       e.preventDefault();
-      setOpen(false);
+      // Restore focus to the trigger when closing from the search input —
+      // the input itself unmounts on close and focus would otherwise land on
+      // <body>, dropping the user out of the combobox (COMPONENT_POLISH §24).
+      const returnFocus = searchRef.current?.matches(":focus") ?? false;
+      closeDropdown(returnFocus);
     }
   }
 
@@ -88,6 +101,7 @@ export function AlgorithmSelector({
       <span className={styles.label}>Algorithm</span>
       <button
         type="button"
+        ref={triggerRef}
         className={styles.trigger}
         role="combobox"
         aria-expanded={open}
@@ -103,8 +117,8 @@ export function AlgorithmSelector({
         <span className={styles.triggerText}>{selected ? selected.label : "Choose Algorithm…"}</span>
         <svg
           className={styles.chevron}
-          width="14"
-          height="14"
+          width="16"
+          height="16"
           viewBox="0 0 24 24"
           fill="none"
           stroke="currentColor"
@@ -117,6 +131,7 @@ export function AlgorithmSelector({
       {open ? (
         <div className={styles.menu} role="presentation">
           <input
+            ref={searchRef}
             type="text"
             className={styles.search}
             placeholder="Search algorithms…"
@@ -129,7 +144,7 @@ export function AlgorithmSelector({
             aria-label="Filter algorithm list"
             onKeyDown={(e) => {
               if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === "Escape") {
-                onKeyDown(e as unknown as React.KeyboardEvent<HTMLButtonElement>);
+                onKeyDown(e);
               }
             }}
           />
@@ -148,7 +163,11 @@ export function AlgorithmSelector({
                   className={`${styles.item}${i === highlight ? ` ${styles.highlight}` : ""}`}
                   onMouseDown={(e) => {
                     e.preventDefault();
-                    select(algo.id);
+                    // mouseDown on the option was likely initiated from the
+                    // search input → return focus to the trigger so keyboard
+                    // users land back on the combobox trigger after pick.
+                    const returnFocus = searchRef.current?.matches(":focus") ?? false;
+                    select(algo.id, returnFocus);
                   }}
                   onMouseEnter={() => setHighlight(i)}
                 >

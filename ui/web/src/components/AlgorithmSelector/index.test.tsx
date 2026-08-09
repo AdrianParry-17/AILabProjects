@@ -65,4 +65,38 @@ describe("AlgorithmSelector", () => {
     fireEvent.keyDown(screen.getByRole("combobox"), { key: "Enter" });
     expect(onChange).not.toHaveBeenCalled();
   });
+
+  it("shows the selected algorithm label in the trigger (T17 selection visible)", () => {
+    render(<AlgorithmSelector catalog={CATALOG} value="dfs" onChange={() => {}} />);
+    const trigger = screen.getByRole("combobox");
+    expect(trigger).toHaveTextContent("Depth-First Search");
+  });
+
+  it("closes the dropdown when Escape is pressed in the search input and restores focus to the trigger", () => {
+    render(<AlgorithmSelector catalog={CATALOG} value="bfs" onChange={() => {}} />);
+    const trigger = screen.getByRole("combobox");
+    fireEvent.click(trigger);
+    const search = screen.getByPlaceholderText(/Search algorithms/i);
+    search.focus();
+    expect(document.activeElement).toBe(search);
+    fireEvent.keyDown(search, { key: "Escape" });
+    // Dropdown closes — the search input unmounts.
+    expect(screen.queryByPlaceholderText(/Search algorithms/i)).toBeNull();
+    // Trigger regains focus so keyboard users stay in the combobox.
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("keeps the trigger aria-expanded / aria-controls / listbox semantics intact across open + close", () => {
+    render(<AlgorithmSelector catalog={CATALOG} value="bfs" onChange={() => {}} />);
+    const trigger = screen.getByRole("combobox");
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    expect(trigger.getAttribute("aria-haspopup")).toBe("listbox");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+    const list = screen.getByRole("listbox", { name: /Algorithm list/i });
+    expect(list).toBeInTheDocument();
+    expect(trigger.getAttribute("aria-controls")).toBe(list.id);
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+  });
 });

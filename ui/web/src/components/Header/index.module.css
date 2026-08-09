@@ -54,8 +54,8 @@
 
 .statusDot {
   display: inline-block;
-  width: 8px;
-  height: 8px;
+  width: var(--node-sm);
+  height: var(--node-sm);
   border-radius: var(--radius-full);
   background: var(--c-text-muted);
   flex: none;
@@ -73,7 +73,7 @@
   font-size: var(--fs-caption);
   font-variant-numeric: tabular-nums;
   color: var(--c-text-muted);
-  padding: 2px var(--space-8);
+  padding: var(--space-4) var(--space-8);
   border: var(--border-hairline) solid var(--c-border);
   border-radius: var(--radius-sm);
   background: var(--c-surface-2);

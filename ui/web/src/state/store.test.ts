@@ -249,3 +249,46 @@ describe("history slice + replayRun", () => {
     expect(useStore.getState().historyLoading).toBe(false);
   });
 });
+
+describe("backend info slice + loadBackendInfo (T14)", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    useStore.setState({ backendOk: null, version: null });
+  });
+
+  it("populates backendOk and version from the existing /health + /version transports", async () => {
+    vi.spyOn(client, "getHealth").mockResolvedValue({ status: "ok" } as never);
+    vi.spyOn(client, "getVersion").mockResolvedValue({
+      service: "hcmc-delivery",
+      version: "0.1.0",
+      api_version: "1.2.3",
+    } as never);
+    await useStore.getState().loadBackendInfo();
+    const state = useStore.getState();
+    expect(state.backendOk).toBe(true);
+    expect(state.version).toBe("1.2.3");
+  });
+
+  it("marks backendOk=false when the health probe rejects (no UI crash)", async () => {
+    vi.spyOn(client, "getHealth").mockRejectedValue(new Error("network"));
+    vi.spyOn(client, "getVersion").mockResolvedValue({
+      service: "hcmc-delivery",
+      version: "0.1.0",
+      api_version: "9.9.9",
+    } as never);
+    await useStore.getState().loadBackendInfo();
+    const state = useStore.getState();
+    expect(state.backendOk).toBe(false);
+    expect(state.version).toBe("9.9.9");
+  });
+
+  it("treats non-ok health payloads as backend down without overwriting a known version", async () => {
+    useStore.setState({ version: "0.0.5" });
+    vi.spyOn(client, "getHealth").mockResolvedValue({ status: "degraded" } as never);
+    vi.spyOn(client, "getVersion").mockRejectedValue(new Error("nope"));
+    await useStore.getState().loadBackendInfo();
+    const state = useStore.getState();
+    expect(state.backendOk).toBe(false);
+    expect(state.version).toBe("0.0.5");
+  });
+});

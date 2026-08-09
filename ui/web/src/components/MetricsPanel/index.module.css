@@ -23,7 +23,7 @@
 }
 
 .copy {
-  height: 24px;
+  height: var(--control-height-sm);
   padding: 0 var(--space-8);
   border: var(--border-hairline) solid var(--c-border);
   border-radius: var(--radius-sm);
@@ -43,8 +43,12 @@
   box-shadow: var(--focus-ring);
 }
 
-/* 2-column compact card grid; collapses to 1 column on narrow viewports so
-   cards stay readable without horizontal scroll. */
+/* 2-column compact card grid on desktop / laptop (>= 1024 px) per
+   COMPONENT_POLISH §11 ("Layout — Grid 2 columns Desktop; Single column
+   Tablet"). The 1024-px breakpoint matches LAYOUT_SPEC §19 (Laptop starts
+   at 1024, Tablet is 768-1023) so the right panel keeps a 2-column grid at
+   laptop and desktop widths and collapses to a single column at tablet and
+   below. */
 .grid {
   list-style: none;
   margin: 0;
@@ -59,7 +63,7 @@
   opacity: 0.5;
 }
 
-@media (max-width: 480px) {
+@media (max-width: 1023px) {
   .grid {
     grid-template-columns: 1fr;
   }
@@ -90,7 +94,7 @@
 .cardLabel {
   font-size: var(--fs-caption);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--ls-caption);
   color: var(--c-text-secondary);
 }
 

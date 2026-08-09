@@ -8,7 +8,7 @@
 .label {
   font-size: var(--fs-caption);
   text-transform: uppercase;
-  letter-spacing: 0.04em;
+  letter-spacing: var(--ls-caption);
   color: var(--c-text-secondary);
 }
 
@@ -60,7 +60,7 @@
 
 .menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + var(--space-4));
   left: 0;
   right: 0;
   z-index: var(--z-dropdown);
@@ -89,7 +89,7 @@
 
 .search:focus-visible {
   background: var(--c-surface);
-  box-shadow: inset 0 0 0 1px var(--c-primary);
+  box-shadow: inset 0 0 0 var(--border-hairline) var(--c-primary);
 }
 
 .list {

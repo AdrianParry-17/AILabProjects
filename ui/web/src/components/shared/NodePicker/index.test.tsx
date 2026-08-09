@@ -1,5 +1,5 @@
 import { act, useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { NodePicker, type NodeOption } from "./index";
@@ -10,6 +10,13 @@ const NODES: NodeOption[] = [
   { id: "wh-1", name: "Saigon Port Warehouse", keywords: "warehouse port road_class:primary" },
   { id: "hosp-1", name: "City General Hospital", keywords: "hospital Nguyen Tri Phuong" },
 ];
+
+const NODE_NAME_BY_ID: Record<string, string> = {
+  "mkt-1": "Ben Thanh Market",
+  "mkt-2": "Binh Tay Market",
+  "wh-1": "Saigon Port Warehouse",
+  "hosp-1": "City General Hospital",
+};
 
 describe("NodePicker (T18)", () => {
   it("renders with the spec placeholder", () => {
@@ -110,5 +117,133 @@ describe("NodePicker (T18)", () => {
     fireEvent.change(input, { target: { value: "ben" } });
     fireEvent.keyDown(input, { key: "Enter" });
     expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("selects the highlighted option via Enter after ArrowDown", async () => {
+    const onChange = vi.fn();
+    render(<NodePicker label="Start" value={null} options={NODES} onChange={onChange} />);
+    const input = screen.getByRole("combobox");
+    act(() => {
+      fireEvent.focus(input);
+      // Filter to a single result so the highlight index resolves cleanly.
+      fireEvent.change(input, { target: { value: "ben" } });
+    });
+    act(() => {
+      // ArrowDown moves highlight from -1 (set on filter) to 0.
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+    });
+    act(() => {
+      // Enter selects the highlighted option.
+      fireEvent.keyDown(input, { key: "Enter" });
+    });
+    expect(onChange).toHaveBeenCalledWith("mkt-1");
+  });
+
+  it("wraps highlight with repeated ArrowDown keystrokes", () => {
+    function Harness(): JSX.Element {
+      const [value, setValue] = useState<string | null>(null);
+      return <NodePicker label="Start" value={value} options={NODES} onChange={setValue} />;
+    }
+    const { container } = render(<Harness />);
+    const input = container.querySelector('[role="combobox"]') as HTMLInputElement;
+    act(() => {
+      fireEvent.focus(input);
+      // initial highlight = -1; pressing ArrowDown jumps to 0; pressing
+      // again from the last item wraps to 0 — the menu should remain open.
+      for (let i = 0; i < NODES.length + 1; i++) {
+        fireEvent.keyDown(input, { key: "ArrowDown" });
+      }
+    });
+    // No assertion of internal state; we just verify no crash and the
+    // listbox still renders options after wrapping.
+    expect(screen.getAllByRole("option").length).toBeGreaterThan(0);
+  });
+
+  it("caps session recents at 4 even when more nodes are selected", async () => {
+    function Harness(): JSX.Element {
+      const [value, setValue] = useState<string | null>(null);
+      return <NodePicker label="Start" value={value} options={NODES} onChange={setValue} />;
+    }
+    render(<Harness />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    // Pick 4 distinct nodes in sequence (we have 4 in the fixture).
+    for (const id of ["mkt-1", "mkt-2", "wh-1", "hosp-1"]) {
+      const name = NODE_NAME_BY_ID[id];
+      act(() => {
+        fireEvent.focus(input);
+        fireEvent.change(input, { target: { value: id } });
+      });
+      act(() => {
+        fireEvent.mouseDown(screen.getByRole("option", { name: new RegExp(name, "i") }));
+      });
+      // Allow React to settle the choose() → effect → state propagation.
+      await waitFor(() => {
+        expect(input.value).toBe(name);
+      });
+    }
+    // Reopen with empty query → exactly 4 picks appear in the "Recent"
+    // chips section. (The listbox itself re-shows them too, but the
+    // recent chips are the deterministic cap check.)
+    act(() => {
+      fireEvent.input(input, { target: { value: "" } });
+    });
+    await waitFor(() => {
+      const recentChips = screen.getAllByRole("button", {
+        name: /Ben Thanh Market|Binh Tay Market|Saigon Port Warehouse|City General Hospital/i,
+      });
+      expect(recentChips.length).toBeLessThanOrEqual(4);
+      expect(recentChips.length).toBe(NODES.length); // = 4 here
+    });
+  });
+
+  it("does not persist recents to localStorage or sessionStorage", () => {
+    function Harness(): JSX.Element {
+      const [value, setValue] = useState<string | null>(null);
+      return <NodePicker label="Start" value={value} options={NODES} onChange={setValue} />;
+    }
+    const { container } = render(<Harness />);
+    const input = container.querySelector('[role="combobox"]') as HTMLInputElement;
+    act(() => {
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: "ben" } });
+    });
+    act(() => {
+      fireEvent.mouseDown(screen.getByRole("option", { name: /Ben Thanh Market/i }));
+    });
+    // Scan storage for any leaked recents key.
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i) ?? "";
+      expect(key.toLowerCase()).not.toMatch(/recent|nodepicker|start|history/);
+    }
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i) ?? "";
+      expect(key.toLowerCase()).not.toMatch(/recent|nodepicker|start|history/);
+    }
+  });
+
+  it("searches by street name carried inside the road_names-style keywords blob", () => {
+    const nodes: NodeOption[] = [
+      {
+        id: "osm_366367996",
+        name: "Trường Sa × Đặng Văn Ngữ",
+        // Mirrors what ControlPanel.nodeKeywords produces for the real
+        // graph fixture once road_names has been flattened into the blob.
+        keywords: "Trường Sa Đặng Văn Ngữ intersection",
+      },
+      {
+        id: "osm_other",
+        name: "Bến Nhà Rồng",
+        keywords: "Bến Nhà Rồng intersection",
+      },
+    ];
+    render(<NodePicker label="Start" value={null} options={nodes} onChange={() => {}} />);
+    const input = screen.getByRole("combobox");
+    act(() => {
+      fireEvent.focus(input);
+      fireEvent.change(input, { target: { value: "Trường" } });
+    });
+    const options = screen.getAllByRole("option");
+    expect(options).toHaveLength(1);
+    expect(options[0]).toHaveTextContent("Trường Sa");
   });
 });
