@@ -6,7 +6,8 @@ import { StatusSection } from "./StatusSection";
 
 /** Map of every status value the store can hold → the data-state the dot
  *  exposes. The mapping must stay in sync with StatusSection.module.css
- *  which paints each `data-state` with the DESIGN_TOKENS §25 status color. */
+ *  which paints each `data-state` with the DESIGN_TOKENS §25 status color.
+ *  The set is the exact `Status` union in state/store.ts. */
 const EXPECTED_DATA_STATE: Readonly<Record<string, string>> = {
   Idle: "Idle",
   Loading: "Loading",
@@ -15,7 +16,6 @@ const EXPECTED_DATA_STATE: Readonly<Record<string, string>> = {
   Paused: "Paused",
   Finished: "Finished",
   Error: "Error",
-  Warning: "Warning",
   Replay: "Replay",
 };
 

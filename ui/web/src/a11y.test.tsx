@@ -19,15 +19,17 @@ describe("Phase P5 — keyboard navigation + ARIA (T21)", () => {
 
   it("App renders the five regions in the spec-required tab order", () => {
     render(<App />);
-    // Header → main → aside (info) → footer (timeline) is the natural DOM order
-    // enforced by App.tsx. Each region is independently addressable.
+    // Header → Sidebar → Visualization (main) → Information (aside) → Timeline
+    // (footer) is the natural DOM order enforced by App.tsx and matches
+    // LAYOUT_SPEC §24. Each region is independently addressable.
     const order = [
       screen.getByRole("banner"),
+      screen.getByRole("complementary", { name: "Search controls" }),
       screen.getByRole("main"),
       screen.getByLabelText("Information"),
       screen.getByLabelText("Playback timeline"),
     ];
-    expect(order.length).toBe(4);
+    expect(order.length).toBe(5);
     // Every subsequent region appears later in the document than the previous
     // (compareDocumentPosition returns FOLLOWING | PRECEDING bits).
     for (let i = 1; i < order.length; i++) {

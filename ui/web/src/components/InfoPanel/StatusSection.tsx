@@ -1,5 +1,5 @@
 import { useStore } from "../../state/store";
-import styles from "./index.module.css";
+import styles from "./StatusSection.module.css";
 
 /** Per-state display text — mirrors the deleted StatusBar mapping (COMPONENT_SPEC §2.10). */
 const STATE_TEXT: Record<string, string> = {
