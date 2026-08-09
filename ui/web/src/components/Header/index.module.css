@@ -79,6 +79,16 @@
   background: var(--c-surface-2);
 }
 
+.versionSkeleton {
+  display: inline-block;
+  width: 64px;
+  color: transparent;
+}
+
+.versionError {
+  color: var(--c-danger);
+}
+
 .pill {
   font-size: var(--fs-caption);
   font-weight: var(--fw-semibold);

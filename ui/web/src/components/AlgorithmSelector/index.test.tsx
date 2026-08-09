@@ -119,3 +119,21 @@ describe("AlgorithmSelector", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 });
+
+describe("AlgorithmSelector T22 — loading/error (UI_TASK_BREAKDOWN §7 T22)", () => {
+  it("shows 'Loading catalog…' when status='loading' (no combobox, no retry)", () => {
+    render(<AlgorithmSelector catalog={[]} value={null} status="loading" onChange={() => {}} />);
+    expect(screen.getByRole("status", { name: "Loading catalog" })).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Retry/i })).toBeNull();
+  });
+
+  it("shows 'Catalog unavailable.' inline when status='error' (no retry)", () => {
+    render(<AlgorithmSelector catalog={[]} value={null} status="error" onChange={() => {}} />);
+    expect(screen.getByTestId("catalog-error")).toBeInTheDocument();
+    expect(screen.getByText("Catalog unavailable.")).toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).toBeNull();
+    // T22: catalog failure is NOT a retry-bearing surface.
+    expect(screen.queryByRole("button", { name: /Retry/i })).toBeNull();
+  });
+});

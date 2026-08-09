@@ -38,7 +38,7 @@ export function MetricsPanel(): JSX.Element {
           <h3 className={styles.title}>Metrics</h3>
         </div>
         <EmptyState
-          title="Run a search to see metrics"
+          title="Run a search to see metrics."
           subtitle="Choose a start location and a destination, then click Run Search."
         />
       </section>

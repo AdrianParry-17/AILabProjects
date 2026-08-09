@@ -8,6 +8,11 @@ interface AlgorithmSelectorProps {
   catalog: readonly AlgorithmSummary[];
   value: string | null;
   disabled?: boolean;
+  /** T22 catalog-load lifecycle. `loading` shows a "Loading catalog…" hint
+   *  instead of the combobox; `error` shows an inline "Catalog unavailable."
+   *  indicator (no retry — retry is reserved for the retry-bearing errors).
+   *  `ready` shows the combobox. */
+  status?: "loading" | "ready" | "error";
   onChange: (id: string) => void;
 }
 
@@ -41,6 +46,7 @@ export function AlgorithmSelector({
   catalog,
   value,
   disabled = false,
+  status = "ready",
   onChange,
 }: AlgorithmSelectorProps): JSX.Element {
   const listId = `${useId()}-list`;
@@ -57,6 +63,28 @@ export function AlgorithmSelector({
     if (!q) return catalog;
     return catalog.filter((a) => a.label.toLowerCase().includes(q));
   }, [catalog, query]);
+
+  if (status === "loading") {
+    return (
+      <div className={styles.wrap}>
+        <span className={styles.label}>Algorithm</span>
+        <p className={styles.placeholder} role="status" aria-label="Loading catalog">
+          Loading catalog…
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "error") {
+    return (
+      <div className={styles.wrap}>
+        <span className={styles.label}>Algorithm</span>
+        <p className={styles.error} role="status" data-testid="catalog-error">
+          Catalog unavailable.
+        </p>
+      </div>
+    );
+  }
 
   function closeDropdown(returnFocus: boolean): void {
     setOpen(false);

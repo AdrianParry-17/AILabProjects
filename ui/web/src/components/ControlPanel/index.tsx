@@ -18,6 +18,8 @@ export function ControlPanel(): JSX.Element {
   const graph = useStore((s) => s.graph);
   const status = useStore((s) => s.status);
   const catalog = useStore((s) => s.catalog);
+  const catalogError = useStore((s) => s.catalogError);
+  const backendOk = useStore((s) => s.backendOk);
   const selectedAlgorithm = useStore((s) => s.selectedAlgorithm);
   const start = useStore((s) => s.start);
   const goal = useStore((s) => s.goal);
@@ -43,6 +45,15 @@ export function ControlPanel(): JSX.Element {
   const invalid = Boolean(start && goal && start === goal);
   const canRun = editable && !busy && Boolean(selectedAlgorithm) && bothChosen && !invalid;
 
+  // T22: catalog lifecycle. `loading` is the first-boot window before
+  // backendOk is resolved; `error` surfaces when the catalog fetch failed;
+  // `ready` once the catalog has at least been probed (regardless of result).
+  const catalogStatus: "loading" | "ready" | "error" = catalogError
+    ? "error"
+    : backendOk === null && catalog.length === 0
+      ? "loading"
+      : "ready";
+
   function submit(): void {
     if (canRun) void runSearch();
   }
@@ -63,7 +74,7 @@ export function ControlPanel(): JSX.Element {
         </SectionCard>
 
         <SectionCard title="Algorithm">
-          <AlgorithmSelector catalog={catalog} value={selectedAlgorithm} disabled={!editable} onChange={setAlgorithm} />
+          <AlgorithmSelector catalog={catalog} value={selectedAlgorithm} disabled={!editable} status={catalogStatus} onChange={setAlgorithm} />
         </SectionCard>
 
         <SectionCard title="Execution">

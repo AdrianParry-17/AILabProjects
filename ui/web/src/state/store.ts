@@ -74,11 +74,15 @@ export interface GraphState extends SearchState, AnimationSlice {
 
   /** Catalog slice: the algorithm catalog fetched once, centrally. */
   catalog: AlgorithmSummary[];
+  /** Display-only: last catalog-fetch failure message (T22 inline indicator). */
+  catalogError: string | null;
   loadCatalog: () => Promise<void>;
 
   /** History slice (§0.2): recorded runs + replay. */
   history: RecordedRun[];
   historyLoading: boolean;
+  /** Display-only: last history-fetch failure message (T22 inline indicator). */
+  historyError: string | null;
   replay: boolean;
   replayRunId: string | null;
   loadHistory: () => Promise<void>;
@@ -105,8 +109,10 @@ export const useStore = create<GraphState>()((set, get) => ({
   selectedNode: null,
   hoveredNode: null,
   catalog: [],
+  catalogError: null,
   history: [],
   historyLoading: false,
+  historyError: null,
   replay: false,
   replayRunId: null,
   backendOk: null,
@@ -120,9 +126,10 @@ export const useStore = create<GraphState>()((set, get) => ({
   loadCatalog: async () => {
     try {
       const payload = await client.listAlgorithms();
-      set({ catalog: payload.algorithms });
-    } catch {
-      set({ catalog: [] });
+      set({ catalog: payload.algorithms, catalogError: null });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Catalog unavailable.";
+      set({ catalog: [], catalogError: message });
     }
   },
 
@@ -205,14 +212,15 @@ export const useStore = create<GraphState>()((set, get) => ({
   speed: 1,
 
   loadHistory: async () => {
-    set({ historyLoading: true });
+    set({ historyLoading: true, historyError: null });
     try {
       const res = await client.getHistory();
       const byId = new Map(get().history.map((r) => [r.id, r]));
       const merged = res.runs.map((summary) => byId.get(summary.id) ?? { ...summary, result: null });
-      set({ history: merged, historyLoading: false });
-    } catch {
-      set({ historyLoading: false });
+      set({ history: merged, historyLoading: false, historyError: null });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not load history.";
+      set({ historyLoading: false, historyError: message });
     }
   },
 

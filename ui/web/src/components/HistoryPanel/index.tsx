@@ -9,6 +9,9 @@ interface HistoryPanelProps {
   history: readonly HistoryRun[];
   activeRunId?: string | null;
   loading?: boolean;
+  /** T22 inline error indicator (no retry — retry is reserved for the
+   *  exhaustive list of retry-bearing errors). */
+  historyError?: string | null;
   labelFor?: (algorithmId: string) => string;
   onReplay: (id: string) => void;
 }
@@ -64,6 +67,7 @@ export function HistoryPanel({
   history,
   activeRunId = null,
   loading = false,
+  historyError = null,
   labelFor = identity,
   onReplay,
 }: HistoryPanelProps): JSX.Element {
@@ -76,8 +80,12 @@ export function HistoryPanel({
           <div className={styles.skeletonRow} />
           <div className={styles.skeletonRow} />
         </div>
+      ) : historyError ? (
+        <p className={styles.error} role="status" data-testid="history-error">
+          {historyError}
+        </p>
       ) : history.length === 0 ? (
-        <EmptyState title="No searches yet" subtitle="Runs appear here after you search." />
+        <EmptyState title="No searches recorded yet." subtitle="Runs appear here after you search." />
       ) : (
         <ul className={styles.list}>
           {history.map((run) => (

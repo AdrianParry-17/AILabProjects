@@ -30,8 +30,33 @@
   transition: opacity var(--motion-normal) var(--ease-panel);
 }
 
+.skeletonStage {
+  background: var(--c-surface-2);
+  animation: graphPaneFadeIn var(--motion-normal) var(--ease-default) 1;
+}
+
+.overlayStage {
+  position: relative;
+  align-items: center;
+  justify-content: center;
+  background: var(--c-bg);
+}
+
+@keyframes graphPaneFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .stage {
     transition: none;
+  }
+
+  .skeletonStage {
+    animation: none;
   }
 }

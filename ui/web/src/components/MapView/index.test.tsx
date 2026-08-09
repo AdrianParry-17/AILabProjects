@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DeliveryNode, SearchResult } from "../../api/types";
 import { frameAt } from "../../services/animation";
@@ -132,24 +132,25 @@ describe("MapView (P3 T11-T13)", () => {
     expect(hostAfter).toBe(hostBefore);
   });
 
-  it("keeps the map host mounted through Error and retry recovery (F1)", () => {
+  it("keeps the map host mounted through Error and recovery (F1) — error overlay is owned by GraphPane", () => {
     seedReady();
     render(<MapView />);
     const hostBefore = screen.getByTestId("map-canvas");
 
+    // T22: graph-load error rendering moved to GraphPane; MapView only mounts
+    // the Leaflet host. The map host must stay mounted when status flips to
+    // Error and recover when status returns to Ready.
     act(() => useStore.setState({ status: "Error", error: "boom" }));
-    const errorOverlay = screen.getByTestId("map-error");
-    expect(errorOverlay).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
     expect(screen.getByTestId("map-canvas")).toBe(hostBefore);
+    expect(screen.queryByTestId("map-tile-error")).toBeNull();
 
     act(() => useStore.setState({ status: "Ready", error: null }));
-    expect(screen.queryByTestId("map-error")).toBeNull();
     expect(screen.getByTestId("map-canvas")).toBe(hostBefore);
+    expect(screen.queryByTestId("map-tile-error")).toBeNull();
     expect(screen.getByTestId("map-overlays")).toBeInTheDocument();
   });
 
-  it("shows only a skeleton before a graph exists, and keeps search results across Loading flips", () => {
+  it("renders an empty host when no graph exists; visualization loading is owned by GraphPane (T22)", () => {
     act(() =>
       useStore.setState({
         status: "Loading",
@@ -158,9 +159,13 @@ describe("MapView (P3 T11-T13)", () => {
         activeIndex: 1,
       }),
     );
-    render(<MapView />);
-    expect(screen.getByTestId("map-skeleton")).toBeInTheDocument();
+    const { container } = render(<MapView />);
+    expect(screen.getByTestId("map-view")).toBeInTheDocument();
+    // MapView stays empty while the visualization region skeleton renders in
+    // GraphPane; the map canvas is not mounted without a graph.
     expect(screen.queryByTestId("map-canvas")).toBeNull();
+    expect(screen.queryByTestId("map-skeleton")).toBeNull();
+    expect(container.querySelector(".leaflet-container")).toBeNull();
 
     // Search-style status flip: Loading → Ready must not reset search state.
     act(() =>
@@ -217,5 +222,57 @@ describe("resolveHoverPoint (T13/F8)", () => {
   it("returns null when there is no anchor to derive", () => {
     expect(resolveHoverPoint(null, NODE, null)).toBeNull();
     expect(resolveHoverPoint(null, null, null)).toBeNull();
+  });
+});
+
+describe("MapView T22 — tile-only error overlay (UI_TASK_BREAKDOWN §7 T22)", () => {
+  afterEach(() => {
+    useStore.setState({
+      graph: null,
+      status: "Idle",
+      error: null,
+      result: null,
+      activeIndex: -1,
+      playing: false,
+      start: null,
+      goal: null,
+      selectedNode: null,
+    });
+  });
+
+  it("MapView does not own the graph-load Retry surface (T22 — moved to GraphPane)", () => {
+    act(() =>
+      useStore.setState({
+        status: "Error",
+        error: "boom",
+        graph: { nodes: NODES, edges: [], bbox: [10.78, 106.69, 10.8, 106.71] },
+      }),
+    );
+    render(<MapView />);
+    // The legacy graph-load error overlay no longer lives inside MapView.
+    expect(screen.queryByTestId("map-error")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  it("MapView does not call loadGraph from any of its Retry buttons (only tile retry is local)", () => {
+    act(() =>
+      useStore.setState({
+        status: "Ready",
+        graph: { nodes: NODES, edges: [], bbox: [10.78, 106.69, 10.8, 106.71] },
+        result: RESULT,
+        activeIndex: 0,
+        start: "a",
+        goal: "c",
+      }),
+    );
+    const spy = vi.spyOn(useStore.getState(), "loadGraph");
+    render(<MapView />);
+    // No "Retry" surface owned by MapView (graph-load retry moved to GraphPane).
+    expect(screen.queryByRole("button", { name: /Retry/i })).toBeNull();
+    // The NodeListFallback rows are buttons and selecting one goes through
+    // store actions (selectNode / setStart / setGoal), not loadGraph.
+    fireEvent.click(screen.getByRole("button", { name: /Alpha/i }));
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

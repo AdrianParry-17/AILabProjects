@@ -47,7 +47,7 @@ describe("MetricsPanel", () => {
 
   it("shows an empty state with guidance when there is no result", () => {
     render(<MetricsPanel />);
-    expect(screen.getByText("Run a search to see metrics")).toBeInTheDocument();
+    expect(screen.getByText("Run a search to see metrics.")).toBeInTheDocument();
     expect(screen.getByText(/Choose a start location/i)).toBeInTheDocument();
   });
 

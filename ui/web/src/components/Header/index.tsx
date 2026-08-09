@@ -23,6 +23,13 @@ export function Header(): JSX.Element {
   const backendText = backendOk == null ? "Checking…" : backendOk ? "Backend connected" : "Backend offline";
   const rendererText = renderer === "map" ? "Map view" : "Graph view";
 
+  // T22: version lifecycle. While backendOk is unresolved we render a
+  // placeholder skeleton; once backendOk is known but version never arrived
+  // (the version probe failed), surface an inline indicator with no retry —
+  // retry is reserved for the exhaustive list of retry-bearing errors.
+  const versionSkeleton = backendOk == null;
+  const versionError = backendOk === false && version == null;
+
   return (
     <header className={styles.header} role="banner">
       <div className={styles.brand}>
@@ -46,6 +53,12 @@ export function Header(): JSX.Element {
         {version ? (
           <span className={styles.version} aria-label={`API version ${version}`}>
             v{version}
+          </span>
+        ) : versionSkeleton ? (
+          <span className={`${styles.version} ${styles.versionSkeleton}`} aria-label="Loading API version" aria-busy="true" />
+        ) : versionError ? (
+          <span className={`${styles.version} ${styles.versionError}`} role="status" data-testid="version-error" aria-label="API version unavailable">
+            v—
           </span>
         ) : null}
         <span

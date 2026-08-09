@@ -61,3 +61,32 @@ describe("Header (T14)", () => {
     expect(screen.getByText("Checking…")).toBeInTheDocument();
   });
 });
+
+describe("Header T22 — version loading/error (UI_TASK_BREAKDOWN §7 T22)", () => {
+  afterEach(() => {
+    act(() =>
+      useStore.setState({
+        backendOk: null,
+        version: null,
+        renderer: "map",
+      }),
+    );
+  });
+
+  it("renders a loading skeleton for the version when backendOk is unresolved", () => {
+    act(() => useStore.setState({ backendOk: null, version: null }));
+    render(<Header />);
+    expect(screen.getByLabelText("Loading API version")).toBeInTheDocument();
+    expect(screen.getByLabelText("Loading API version").getAttribute("aria-busy")).toBe("true");
+    expect(screen.queryByTestId("version-error")).toBeNull();
+  });
+
+  it("renders an inline version error indicator (NO retry) when backendOk is false and version never arrived", () => {
+    act(() => useStore.setState({ backendOk: false, version: null }));
+    render(<Header />);
+    expect(screen.getByTestId("version-error")).toBeInTheDocument();
+    expect(screen.getByLabelText("API version unavailable")).toBeInTheDocument();
+    // T22: version failure is NOT a retry-bearing surface.
+    expect(screen.queryByRole("button", { name: /Retry/i })).toBeNull();
+  });
+});

@@ -54,7 +54,6 @@ export function resolveHoverPoint(
 
 export function MapView(): JSX.Element {
   const status = useStore((s) => s.status);
-  const error = useStore((s) => s.error);
   const graph = useStore((s) => s.graph);
   const result = useStore((s) => s.result);
   const activeIndex = useStore((s) => s.activeIndex);
@@ -65,7 +64,6 @@ export function MapView(): JSX.Element {
   const selectNode = useStore((s) => s.selectNode);
   const setHoveredNode = useStore((s) => s.setHoveredNode);
   const selectedNode = useStore((s) => s.selectedNode);
-  const loadGraph = useStore((s) => s.loadGraph);
 
   const frame = useFrameSync(result, activeIndex);
 
@@ -74,22 +72,38 @@ export function MapView(): JSX.Element {
   const { view } = useLeaflet(containerRef, bounds);
 
   const [tilesLoaded, setTilesLoaded] = useState(false);
+  const [tileError, setTileError] = useState(false);
   const [popupNode, setPopupNode] = useState<PopupNode | null>(null);
   const [hoverNode, setHoverNode] = useState<DeliveryNode | null>(null);
   const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
+
+  /** Retry-tiles: re-arms the tile-layer listeners so a successful tile load
+   *  clears the error overlay. Re-issues tile requests only; does NOT call
+   *  the backend API. */
+  const retryTiles = useCallback((): void => {
+    setTileError(false);
+    setTilesLoaded(false);
+    if (!view) return;
+    view.tileLayer.redraw();
+  }, [view]);
 
   const nodesById = useMemo(
     () => new Map((graph?.nodes ?? []).map((n) => [n.id, n] as const)),
     [graph],
   );
 
-  /** First-tile load fades the skeleton out (spec §22 loading state). */
+  /** First-tile load fades the skeleton out (spec §22 loading state). Tile
+   *  fetch errors surface a centered "Retry tiles" card; the retry re-issues
+   *  tile requests only and never calls the backend API (T22). */
   useEffect(() => {
-    if (!view || tilesLoaded) return;
+    if (!view) return;
     const handle = (): void => setTilesLoaded(true);
+    const handleError = (): void => setTileError(true);
     view.tileLayer.once("load", handle);
+    view.tileLayer.on("tileerror", handleError);
     return () => {
       view.tileLayer.off("load", handle);
+      view.tileLayer.off("tileerror", handleError);
     };
   }, [view, tilesLoaded]);
 
@@ -170,25 +184,12 @@ export function MapView(): JSX.Element {
     return { left: point.x, top: point.y, transform: "translate(-50%, -115%)" };
   }, [view, popupNode]);
 
-  // Before any graph exists the map host cannot be created (no bounds):
-  // Loading shows a skeleton, everything else shows the shared EmptyState.
-  if (status === "Loading" && !graph) {
-    return (
-      <div className={styles.overlayWrap} data-testid="map-view">
-        <div className={styles.skeletonMap} data-testid="map-skeleton" aria-busy="true" />
-      </div>
-    );
-  }
+  // Empty/error/loading for the visualization region live in GraphPane (T22);
+  // here we only need to render the active map. Defensive: GraphPane should
+  // already guard this, but skip if no graph so we don't try to mount Leaflet
+  // without bounds.
   if (!graph) {
-    return (
-      <div className={styles.overlayWrap} data-testid="map-view">
-        <EmptyState
-          title={status === "Error" ? "Graph load failed" : "No graph loaded"}
-          subtitle={status === "Error" ? (error ?? "Could not load graph data.") : "Load graph to begin."}
-          action={status === "Error" ? <Button onClick={() => void loadGraph()}>Retry</Button> : undefined}
-        />
-      </div>
-    );
+    return <div className={styles.overlayWrap} data-testid="map-view" />;
   }
 
   const startId = result && result.path.length > 0 ? result.path[0] : start;
@@ -274,12 +275,12 @@ export function MapView(): JSX.Element {
       {showSkeleton ? (
         <div className={styles.skeletonMap} data-testid="map-skeleton" aria-busy="true" />
       ) : null}
-      {status === "Error" ? (
-        <div className={styles.errorDim} data-testid="map-error" role="status">
+      {tileError && !tilesLoaded ? (
+        <div className={styles.errorDim} data-testid="map-tile-error" role="status" aria-label="Map tile fetch failed">
           <EmptyState
-            title="Graph load failed"
-            subtitle={error ?? "Could not load graph data."}
-            action={<Button onClick={() => void loadGraph()}>Retry</Button>}
+            title="Map tiles unavailable"
+            subtitle="Could not load map tiles. The graph data is unaffected."
+            action={<Button onClick={retryTiles}>Retry tiles</Button>}
           />
         </div>
       ) : null}

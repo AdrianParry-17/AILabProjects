@@ -89,6 +89,16 @@
   gap: var(--space-4);
 }
 
+.error {
+  margin: 0;
+  padding: var(--space-12);
+  font-size: var(--fs-caption);
+  color: var(--c-danger);
+  background: var(--c-surface-2);
+  border: var(--border-hairline) solid var(--c-border);
+  border-radius: var(--radius-sm);
+}
+
 .skeletonRow {
   height: 64px;
   border-radius: var(--radius-sm);

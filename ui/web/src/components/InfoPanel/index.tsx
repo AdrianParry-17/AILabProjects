@@ -21,6 +21,7 @@ const HistoryPanel = lazy(() => import("../HistoryPanel"));
 export function InfoPanel(): JSX.Element {
   const history = useStore((s) => s.history);
   const historyLoading = useStore((s) => s.historyLoading);
+  const historyError = useStore((s) => s.historyError);
   const replayRunId = useStore((s) => s.replayRunId);
   const status = useStore((s) => s.status);
   const replayRun = useStore((s) => s.replayRun);
@@ -48,6 +49,7 @@ export function InfoPanel(): JSX.Element {
               history={history}
               activeRunId={replayRunId}
               loading={historyLoading}
+              historyError={historyError}
               labelFor={labelFor}
               onReplay={replayRun}
             />

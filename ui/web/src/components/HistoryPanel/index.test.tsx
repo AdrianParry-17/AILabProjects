@@ -82,6 +82,28 @@ describe("HistoryPanel", () => {
 
   it("renders the empty state when there are no runs", () => {
     render(<HistoryPanel history={[]} onReplay={() => {}} />);
-    expect(screen.getByText("No searches yet")).toBeInTheDocument();
+    expect(screen.getByText("No searches recorded yet.")).toBeInTheDocument();
+  });
+});
+
+describe("HistoryPanel T22 — inline error indicator (UI_TASK_BREAKDOWN §7 T22)", () => {
+  it("shows an inline error indicator (NO retry) when historyError is set", () => {
+    render(<HistoryPanel history={[]} historyError="Could not load history." onReplay={() => {}} />);
+    expect(screen.getByTestId("history-error")).toBeInTheDocument();
+    expect(screen.getByText("Could not load history.")).toBeInTheDocument();
+    // T22: history failure is NOT a retry-bearing surface.
+    expect(screen.queryByRole("button", { name: /Retry/i })).toBeNull();
+  });
+
+  it("prefers an inline error over the empty state when both could apply", () => {
+    render(<HistoryPanel history={[]} historyError="boom" onReplay={() => {}} />);
+    expect(screen.getByTestId("history-error")).toBeInTheDocument();
+    expect(screen.queryByText(/No searches recorded yet/i)).toBeNull();
+  });
+
+  it("prefers the loading skeleton over the inline error when loading and historyError are both set", () => {
+    render(<HistoryPanel history={[]} loading historyError="boom" onReplay={() => {}} />);
+    expect(screen.getByRole("status", { name: "Loading history" })).toBeInTheDocument();
+    expect(screen.queryByTestId("history-error")).toBeNull();
   });
 });
