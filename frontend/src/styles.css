@@ -1857,12 +1857,17 @@ input[type="range"]::-moz-range-thumb {
   filter: drop-shadow(0 0 3px rgba(32, 189, 231, 0.34));
 }
 
-.map-frame.is-searching .base-road-edge {
+.leaflet-roads-pane canvas,
+.leaflet-graph-nodes-pane canvas {
+  transition: opacity 180ms ease, filter 180ms ease;
+}
+
+.map-frame.is-searching .leaflet-roads-pane canvas {
   opacity: 0.34;
 }
 
-.map-frame.is-searching .base-graph-node:not(.is-endpoint) {
-  opacity: 0.25;
+.map-frame.is-searching .leaflet-graph-nodes-pane canvas {
+  opacity: 0.24;
 }
 
 .search-node-state {

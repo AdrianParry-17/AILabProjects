@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { ApiError, trafficApi } from "./api";
@@ -59,7 +59,7 @@ const FALLBACK_METADATA: MetadataPayload = {
     { id: "held_karp", name: "Held–Karp exact", description: "Dynamic programming tối ưu cho tối đa 10 stops.", complete: true, optimal: true },
     { id: "simulated_annealing", name: "Simulated Annealing", description: "Metaheuristic thoát local optimum.", complete: true, optimal: false },
   ],
-  defaults: { algorithm: "astar", heuristic: "travel_time", objective: "emergency", scenario: "morning_rush", weights: DEFAULT_WEIGHTS },
+  defaults: { algorithm: "astar", heuristic: "travel_time", objective: "balanced", scenario: "normal", weights: DEFAULT_WEIGHTS },
 };
 
 function errorMessage(error: unknown): string | undefined {
@@ -84,8 +84,8 @@ export default function App() {
   const [stops, setStops] = useState<string[]>([]);
   const [algorithm, setAlgorithm] = useState("astar");
   const [heuristic, setHeuristic] = useState("travel_time");
-  const [objective, setObjective] = useState("emergency");
-  const [scenario, setScenario] = useState("morning_rush");
+  const [objective, setObjective] = useState("balanced");
+  const [scenario, setScenario] = useState("normal");
   const [weights, setWeights] = useState<CostWeights>(DEFAULT_WEIGHTS);
   const [selectionTarget, setSelectionTarget] = useState<"start" | "goal" | "stop">("start");
   const [comparisonAlgorithms, setComparisonAlgorithms] = useState(["bfs", "ucs", "astar", "greedy_best_first"]);
@@ -101,7 +101,12 @@ export default function App() {
   const healthQuery = useQuery({ queryKey: ["health"], queryFn: trafficApi.health, retry: 1, refetchInterval: 30_000 });
   const metadataQuery = useQuery({ queryKey: ["metadata"], queryFn: trafficApi.metadata });
   const metadata = metadataQuery.data || FALLBACK_METADATA;
-  const graphQuery = useQuery({ queryKey: ["graph", scenario], queryFn: () => trafficApi.graph(scenario) });
+  const graphQuery = useQuery({
+    queryKey: ["graph", scenario],
+    queryFn: () => trafficApi.graph(scenario),
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60_000,
+  });
   const graph = graphQuery.data;
 
   useEffect(() => {
@@ -115,16 +120,6 @@ export default function App() {
       if (hospital.id !== start) setGoal(hospital.id);
     }
   }, [graph, start, goal]);
-
-  useEffect(() => {
-    const defaults = metadataQuery.data?.defaults;
-    if (!defaults) return;
-    if (defaults.algorithm) setAlgorithm(defaults.algorithm);
-    if (defaults.heuristic) setHeuristic(defaults.heuristic);
-    if (defaults.objective) setObjective(defaults.objective);
-    if (defaults.scenario) setScenario(defaults.scenario);
-    if (defaults.weights) setWeights(defaults.weights);
-  }, [metadataQuery.data]);
 
   const baseRequest = { start, goal, algorithm, heuristic, objective, scenario, weights, vehicle: "ambulance", trace: true };
 
@@ -226,6 +221,12 @@ export default function App() {
     setTraceIndex(0);
   }, [mode, scenario]);
 
+  useEffect(() => {
+    setRouteResult(undefined);
+    setCompareResult(undefined);
+    setMultiResult(undefined);
+  }, [scenario]);
+
   const handleMapSelect = useCallback((id: string) => {
     if (selectionTarget === "start") {
       setStart(id);
@@ -237,12 +238,12 @@ export default function App() {
     }
   }, [selectionTarget, mode, start]);
 
-  function handleMode(next: PlannerMode) {
+  const handleMode = useCallback((next: PlannerMode) => {
     setMode(next);
     setSelectionTarget(next === "multi" ? "stop" : "start");
-  }
+  }, []);
 
-  function handleObjective(next: string) {
+  const handleObjective = useCallback((next: string) => {
     setObjective(next);
     const presets: Record<string, CostWeights> = {
       balanced: { distance: 1, time: 1.35, congestion: 2.2, risk: 3.4 },
@@ -252,19 +253,19 @@ export default function App() {
       emergency: { distance: 0.7, time: 5, congestion: 3.2, risk: 2.2 },
     };
     if (presets[next]) setWeights(presets[next]);
-  }
+  }, []);
 
-  function handleWeights(next: CostWeights) {
+  const handleWeights = useCallback((next: CostWeights) => {
     setWeights(next);
     setObjective("custom");
-  }
+  }, []);
 
-  function run() {
+  const run = useCallback(() => {
     setPlaying(false);
     if (mode === "compare") compareMutation.mutate();
     else if (mode === "multi") multiMutation.mutate();
     else routeMutation.mutate();
-  }
+  }, [mode, compareMutation.mutate, multiMutation.mutate, routeMutation.mutate]);
 
   const activeMutation = mode === "compare" ? compareMutation : mode === "multi" ? multiMutation : routeMutation;
   const scenarioName = metadata.scenarios.find((item) => item.id === scenario)?.name || scenario;

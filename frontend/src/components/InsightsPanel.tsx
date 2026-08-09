@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -28,7 +29,7 @@ function MetricCard({ icon, label, value, tone }: { icon: React.ReactNode; label
   );
 }
 
-export function InsightsPanel({ result, selectedPathNames }: Props) {
+export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathNames }: Props) {
   const metrics = result?.metrics;
   const explanation = explanationParts(result?.explanation as SearchResponse["explanation"]);
   const pathNames = selectedPathNames || (result && "path_names" in result ? result.path_names : undefined) || (result && "order_names" in result ? result.order_names : undefined) || [];
@@ -113,4 +114,4 @@ export function InsightsPanel({ result, selectedPathNames }: Props) {
       )}
     </aside>
   );
-}
+});

@@ -42,8 +42,8 @@ export function congestionColor(level: number, closed = false): string {
 }
 
 export const DEFAULT_WEIGHTS = {
-  distance: 1,
-  time: 1.35,
-  congestion: 2.2,
-  risk: 3.4,
+  distance: 0.25,
+  time: 0.5,
+  congestion: 0.2,
+  risk: 0.05,
 };

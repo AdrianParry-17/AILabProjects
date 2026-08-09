@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { Award, BrainCircuit, Clock3, Cpu, Gauge, Network, Route } from "lucide-react";
 import {
   Bar,
@@ -13,7 +14,7 @@ import {
 import type { CompareResponse, MetadataPayload } from "../types";
 import { compactNumber, formatDistance, formatRuntime, formatTime } from "../lib/format";
 
-export function ComparePanel({ data, metadata }: { data?: CompareResponse; metadata: MetadataPayload }) {
+export const ComparePanel = memo(function ComparePanel({ data, metadata }: { data?: CompareResponse; metadata: MetadataPayload }) {
   const rows = (data?.results || []).map((result) => ({
     id: result.algorithm,
     name: metadata.algorithms.find((item) => item.id === result.algorithm)?.name || result.algorithm,
@@ -98,4 +99,4 @@ export function ComparePanel({ data, metadata }: { data?: CompareResponse; metad
       )}
     </aside>
   );
-}
+});

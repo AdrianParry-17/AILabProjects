@@ -1,3 +1,4 @@
+import { memo } from "react";
 import {
   AlertTriangle,
   ArrowDownUp,
@@ -129,7 +130,7 @@ function GuaranteeBadge({ algorithm }: { algorithm?: AlgorithmMeta }) {
   );
 }
 
-export function ControlDeck(props: Props) {
+export const ControlDeck = memo(function ControlDeck(props: Props) {
   const {
     mode, graph, metadata, start, goal, stops, algorithm, heuristic, objective, scenario, weights,
     selectionTarget, comparisonAlgorithms, multiMethod, returnToStart, loading, error,
@@ -303,4 +304,4 @@ export function ControlDeck(props: Props) {
       </button>
     </aside>
   );
-}
+});

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { BookOpen, GitCompareArrows, MapPinned, Route } from "lucide-react";
 import type { PlannerMode } from "../types";
 
@@ -8,7 +9,7 @@ const tabs: { id: PlannerMode; label: string; icon: typeof Route }[] = [
   { id: "learn", label: "Thuật toán", icon: BookOpen },
 ];
 
-export function ModeTabs({ value, onChange }: { value: PlannerMode; onChange: (value: PlannerMode) => void }) {
+export const ModeTabs = memo(function ModeTabs({ value, onChange }: { value: PlannerMode; onChange: (value: PlannerMode) => void }) {
   return (
     <nav className="mode-tabs" aria-label="Chế độ phòng lab">
       {tabs.map(({ id, label, icon: Icon }) => (
@@ -24,4 +25,4 @@ export function ModeTabs({ value, onChange }: { value: PlannerMode; onChange: (v
       ))}
     </nav>
   );
-}
+});

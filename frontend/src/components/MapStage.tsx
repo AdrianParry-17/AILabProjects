@@ -1,12 +1,13 @@
-import { memo, useEffect, useMemo } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
+import { canvas as createCanvasRenderer, circleMarker, DomEvent, type Path, type Renderer } from "leaflet";
+import type { FeatureCollection, LineString, Point } from "geojson";
 import {
   CircleMarker,
+  GeoJSON,
   MapContainer,
   Pane,
   Polyline,
-  Popup,
   TileLayer,
-  Tooltip,
   useMap,
   useMapEvents,
 } from "react-leaflet";
@@ -26,7 +27,7 @@ interface Props {
   loading?: boolean;
 }
 
-function FitGraph({ graph }: { graph: GraphPayload }) {
+const FitGraph = memo(function FitGraph({ graph }: { graph: GraphPayload }) {
   const map = useMap();
   const signature = graph.nodes.map((node) => `${node.lat},${node.lon}`).join("|");
   useEffect(() => {
@@ -35,9 +36,9 @@ function FitGraph({ graph }: { graph: GraphPayload }) {
     map.fitBounds(bounds, { padding: [38, 38], maxZoom: 14 });
   }, [map, signature]);
   return null;
-}
+});
 
-function NearestNodePicker({ graph, onSelect }: { graph: GraphPayload; onSelect: (id: string) => void }) {
+const NearestNodePicker = memo(function NearestNodePicker({ graph, onSelect }: { graph: GraphPayload; onSelect: (id: string) => void }) {
   useMapEvents({
     click(event) {
       let best: { id: string; score: number } | undefined;
@@ -52,7 +53,7 @@ function NearestNodePicker({ graph, onSelect }: { graph: GraphPayload; onSelect:
     },
   });
   return null;
-}
+});
 
 function routeCoordinates(result?: SearchResponse | MultiRouteResponse): [number, number][] {
   const coordinates = result?.route_geojson?.geometry?.coordinates || [];
@@ -73,35 +74,75 @@ function edgeCoordinates(
 const BaseRoadNetwork = memo(function BaseRoadNetwork({
   graph,
   nodeById,
+  renderer,
 }: {
   graph: GraphPayload;
   nodeById: Map<string, GraphPayload["nodes"][number]>;
+  renderer: Renderer;
 }) {
+  const topologyKey = `${graph.name}|${graph.generated_at || "snapshot"}|${graph.nodes.length}|${graph.edges.length}`;
+  const conditions = useMemo(() => new Map(graph.edges.map((edge, index) => [edge.id || `${edge.source}-${edge.target}-${index}`, edge])), [graph.edges]);
+  const conditionsRef = useRef(conditions);
+  conditionsRef.current = conditions;
+  const data = useMemo<FeatureCollection<LineString>>(() => ({
+    type: "FeatureCollection",
+    features: graph.edges.flatMap((edge, index) => {
+      const positions = edge.geometry?.length
+        ? edge.geometry
+        : (() => {
+          const source = nodeById.get(edge.source);
+          const target = nodeById.get(edge.target);
+          return source && target ? [[source.lon, source.lat], [target.lon, target.lat]] : [];
+        })();
+      if (positions.length < 2) return [];
+      return [{
+        type: "Feature" as const,
+        id: edge.id || `${edge.source}-${edge.target}-${index}`,
+        geometry: { type: "LineString" as const, coordinates: positions },
+        properties: {
+          edgeId: edge.id || `${edge.source}-${edge.target}-${index}`,
+        },
+      }];
+    }),
+  }), [topologyKey, nodeById]);
+
   return (
     <Pane name="roads" style={{ zIndex: 410 }}>
-      {graph.edges.map((edge, index) => {
-        const positions = edgeCoordinates(edge, nodeById);
-        if (positions.length < 2) return null;
-        return (
-          <Polyline
-            key={edge.id || `${edge.source}-${edge.target}-${index}`}
-            positions={positions}
-            pathOptions={{
-              color: congestionColor(edge.congestion, edge.closed),
-              weight: edge.closed ? 4 : 2.4,
-              opacity: edge.closed ? 0.8 : 0.46,
-              dashArray: edge.closed ? "7 6" : undefined,
-              className: "base-road-edge",
-            }}
-          >
-            <Tooltip sticky opacity={0.96} className="road-tooltip">
-              <strong>{edge.name || "Đường chưa đặt tên"}</strong><br />
-              {Math.round(edge.distance_m)} m • mật độ {edge.congestion.toFixed(1)}/5
-              {edge.flags?.length ? <><br />{edge.flags.join(" • ")}</> : null}
-            </Tooltip>
-          </Polyline>
-        );
-      })}
+      <GeoJSON
+        data={data}
+        style={(feature) => {
+          const edge = conditions.get(String(feature?.properties?.edgeId || feature?.id || ""));
+          return {
+            renderer,
+            color: congestionColor(edge?.congestion || 1, Boolean(edge?.closed)),
+            weight: edge?.closed ? 4 : 2.4,
+            opacity: edge?.closed ? 0.8 : 0.46,
+            dashArray: edge?.closed ? "7 6" : undefined,
+          };
+        }}
+        onEachFeature={(feature, layer) => {
+          const edgeId = String(feature.properties?.edgeId || feature.id || "");
+          layer.bindTooltip(() => {
+            const edge = conditionsRef.current.get(edgeId);
+            const root = document.createElement("div");
+            const title = document.createElement("strong");
+            title.textContent = edge?.name || "Đường chưa đặt tên";
+            root.append(title, document.createElement("br"));
+            root.append(`${Math.round(edge?.distance_m || 0)} m • mật độ ${(edge?.congestion || 1).toFixed(1)}/5`);
+            if (edge?.flags?.length) root.append(document.createElement("br"), edge.flags.join(" • "));
+            return root;
+          }, { sticky: true, opacity: 0.96, className: "road-tooltip" });
+          const path = layer as Path;
+          layer.on("mouseover", () => {
+            const edge = conditionsRef.current.get(edgeId);
+            path.setStyle({ weight: edge?.closed ? 5 : 3.5, opacity: 0.86 });
+          });
+          layer.on("mouseout", () => {
+            const edge = conditionsRef.current.get(edgeId);
+            path.setStyle({ weight: edge?.closed ? 4 : 2.4, opacity: edge?.closed ? 0.8 : 0.46 });
+          });
+        }}
+      />
     </Pane>
   );
 });
@@ -112,60 +153,88 @@ const BaseNodeLayer = memo(function BaseNodeLayer({
   goal,
   stops,
   onSelectNode,
+  renderer,
 }: {
   graph: GraphPayload;
   start?: string;
   goal?: string;
   stops: string[];
   onSelectNode: (id: string) => void;
+  renderer: Renderer;
 }) {
+  const topologyKey = `${graph.name}|${graph.generated_at || "snapshot"}|${graph.nodes.length}|${graph.edges.length}`;
+  const data = useMemo<FeatureCollection<Point>>(() => ({
+    type: "FeatureCollection",
+    features: graph.nodes.map((node) => ({
+      type: "Feature",
+      id: node.id,
+      geometry: { type: "Point", coordinates: [node.lon, node.lat] },
+      properties: { ...node },
+    })),
+  }), [topologyKey]);
+  const stopSet = useMemo(() => new Set(stops), [stops]);
+
   return (
     <Pane name="graph-nodes" style={{ zIndex: 455 }}>
-      {graph.nodes.map((node) => {
-        const isStart = node.id === start;
-        const isGoal = node.id === goal;
-        const isStop = stops.includes(node.id);
-        const accent = isStart
-          ? "#34d399"
-          : isGoal
-            ? "#fb7185"
-            : isStop
-              ? "#c084fc"
-              : node.is_hospital || node.kind === "hospital"
-                ? "#f472b6"
-                : "#a8b7ca";
-        const radius = isStart || isGoal ? 8.5 : isStop ? 7.5 : node.is_hospital ? 6 : 4;
-        return (
-          <CircleMarker
-            key={node.id}
-            center={[node.lat, node.lon]}
-            radius={radius}
-            eventHandlers={{ click: (event) => { event.originalEvent.stopPropagation(); onSelectNode(node.id); } }}
-            pathOptions={{
-              color: "#06111f",
-              weight: 2,
-              fillColor: accent,
-              fillOpacity: 0.96,
-              className: `base-graph-node${isStart || isGoal || isStop ? " is-endpoint" : ""}`,
-            }}
-          >
-            <Tooltip direction="top" offset={[0, -5]} opacity={0.98}>{node.name}</Tooltip>
-            <Popup>
-              <div className="node-popup">
-                <strong>{node.name}</strong>
-                <span>{node.kind.replaceAll("_", " ")} {node.district ? `• ${node.district}` : ""}</span>
-                {node.address && <small>{node.address}</small>}
-                <button type="button" onClick={() => onSelectNode(node.id)}>Chọn điểm này</button>
-              </div>
-            </Popup>
-          </CircleMarker>
-        );
-      })}
+      <GeoJSON
+        data={data}
+        pointToLayer={(feature, latlng) => {
+          const node = feature.properties || {};
+          const isStart = node.id === start;
+          const isGoal = node.id === goal;
+          const isStop = stopSet.has(String(node.id));
+          const accent = isStart
+            ? "#34d399"
+            : isGoal
+              ? "#fb7185"
+              : isStop
+                ? "#c084fc"
+                : node.is_hospital || node.kind === "hospital"
+                  ? "#f472b6"
+                  : "#a8b7ca";
+          return circleMarker(latlng, {
+            renderer,
+            radius: isStart || isGoal ? 8.5 : isStop ? 7.5 : node.is_hospital ? 6 : 4,
+            color: "#06111f",
+            weight: 2,
+            fillColor: accent,
+            fillOpacity: 0.96,
+          });
+        }}
+        onEachFeature={(feature, layer) => {
+          const node = feature.properties || {};
+          const id = String(node.id || feature.id || "");
+          layer.bindTooltip(String(node.name || "Giao lộ chưa đặt tên"), { direction: "top", offset: [0, -5], opacity: 0.98 });
+          const popup = document.createElement("div");
+          popup.className = "node-popup";
+          const title = document.createElement("strong");
+          title.textContent = String(node.name || "Giao lộ chưa đặt tên");
+          const kind = document.createElement("span");
+          kind.textContent = `${String(node.kind || "intersection").replaceAll("_", " ")}${node.district ? ` • ${node.district}` : ""}`;
+          popup.append(title, kind);
+          if (node.address) {
+            const address = document.createElement("small");
+            address.textContent = String(node.address);
+            popup.append(address);
+          }
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = "Chọn điểm này";
+          button.addEventListener("click", (event) => { event.stopPropagation(); onSelectNode(id); });
+          popup.append(button);
+          layer.bindPopup(popup);
+          layer.on("click", (event: any) => {
+            if (event.originalEvent) DomEvent.stopPropagation(event.originalEvent);
+            onSelectNode(id);
+          });
+        }}
+      />
     </Pane>
   );
 }, (previous, next) => previous.graph === next.graph
   && previous.start === next.start
   && previous.goal === next.goal
+  && previous.renderer === next.renderer
   && previous.onSelectNode === next.onSelectNode
   && previous.stops.join("|") === next.stops.join("|"));
 
@@ -180,8 +249,12 @@ export function MapStage({
   onSelectNode,
   loading,
 }: Props) {
-  const nodeById = useMemo(() => new Map(graph?.nodes.map((node) => [node.id, node]) || []), [graph]);
+  const topologyKey = graph ? `${graph.name}|${graph.generated_at || "snapshot"}|${graph.nodes.length}|${graph.edges.length}` : "empty";
+  const topologyNodes = useMemo(() => graph?.nodes || [], [topologyKey]);
+  const nodeById = useMemo(() => new Map(topologyNodes.map((node) => [node.id, node])), [topologyNodes]);
   const edgeById = useMemo(() => new Map(graph?.edges.flatMap((edge) => edge.id ? [[edge.id, edge] as const] : []) || []), [graph]);
+  const roadRenderer = useMemo(() => createCanvasRenderer({ pane: "roads", padding: 0.35 }), []);
+  const nodeRenderer = useMemo(() => createCanvasRenderer({ pane: "graph-nodes", padding: 0.35 }), []);
   const visited = new Set(traceStep?.visited || traceStep?.explored || []);
   const frontier = new Set(traceStep?.frontier || []);
   const discovered = new Set(traceStep?.newly_discovered || []);
@@ -241,7 +314,7 @@ export function MapStage({
           {graph && <FitGraph graph={graph} />}
           {graph && <NearestNodePicker graph={graph} onSelect={onSelectNode} />}
 
-          {graph && <BaseRoadNetwork graph={graph} nodeById={nodeById} />}
+          {graph && <BaseRoadNetwork graph={graph} nodeById={nodeById} renderer={roadRenderer} />}
 
           <Pane name="search-tree" style={{ zIndex: 425 }}>
             {exploredPaths.length > 0 && (
@@ -276,19 +349,22 @@ export function MapStage({
             )}
           </Pane>
 
-          {graph && <BaseNodeLayer graph={graph} start={start} goal={goal} stops={stops} onSelectNode={onSelectNode} />}
+          {graph && <BaseNodeLayer graph={graph} start={start} goal={goal} stops={stops} onSelectNode={onSelectNode} renderer={nodeRenderer} />}
 
           <Pane name="search-nodes" style={{ zIndex: 470 }}>
-            {graph?.nodes.filter((node) => visited.has(node.id) || frontier.has(node.id) || discovered.has(node.id) || node.id === traceStep?.current).map((node) => {
+            {graph?.nodes.filter((node) => visited.has(node.id) || frontier.has(node.id) || discovered.has(node.id) || node.id === traceStep?.current || node.id === start || node.id === goal || stops.includes(node.id)).map((node) => {
               const isCurrent = node.id === traceStep?.current;
               const isFrontier = frontier.has(node.id);
               const isDiscovered = discovered.has(node.id);
-              const accent = isCurrent ? "#ffffff" : isDiscovered ? "#a3e635" : isFrontier ? "#fbbf24" : "#38bdf8";
+              const isStart = node.id === start;
+              const isGoal = node.id === goal;
+              const isStop = stops.includes(node.id);
+              const accent = isCurrent ? "#ffffff" : isStart ? "#34d399" : isGoal ? "#fb7185" : isStop ? "#c084fc" : isDiscovered ? "#a3e635" : isFrontier ? "#fbbf24" : "#38bdf8";
               return (
                 <CircleMarker
                   key={`search-${node.id}`}
                   center={[node.lat, node.lon]}
-                  radius={isCurrent ? 9.5 : isDiscovered ? 5.4 : isFrontier ? 4.5 : 3.2}
+                  radius={isCurrent ? 9.5 : isStart || isGoal ? 8.5 : isStop ? 7.5 : isDiscovered ? 5.4 : isFrontier ? 4.5 : 3.2}
                   pathOptions={{
                     color: isCurrent ? "#38d9ff" : "#06111f",
                     weight: isCurrent ? 4 : 1.5,

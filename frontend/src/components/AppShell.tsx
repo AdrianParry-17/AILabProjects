@@ -1,5 +1,5 @@
 import { Activity, Ambulance, CloudRain, Database, Radio, ShieldCheck } from "lucide-react";
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 
 interface Props {
   online: boolean;
@@ -7,7 +7,7 @@ interface Props {
   children: ReactNode;
 }
 
-export function AppHeader({ online, scenarioName }: Pick<Props, "online" | "scenarioName">) {
+export const AppHeader = memo(function AppHeader({ online, scenarioName }: Pick<Props, "online" | "scenarioName">) {
   return (
     <header className="app-header">
       <div className="brand-lockup">
@@ -28,7 +28,7 @@ export function AppHeader({ online, scenarioName }: Pick<Props, "online" | "scen
       </div>
     </header>
   );
-}
+});
 
 export function AppShell({ online, scenarioName, children }: Props) {
   return (
