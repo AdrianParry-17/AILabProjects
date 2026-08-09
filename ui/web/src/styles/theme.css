@@ -204,7 +204,6 @@
   --border-hairline: 1px;
   --border-strong: 2px;
   --border-focus: 2px;
-  --border-selected: 2px;
 
   /* =============== Shadows + elevation (DESIGN_TOKENS §13–§14) =============== */
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.06);
@@ -218,8 +217,6 @@
   --shadow-focus: 0 0 0 3px rgb(14 119 102 / 0.28);
 
   /* Focus ring (DESIGN_TOKENS §26): width 2 px, radius 8 px, Primary-500. */
-  --focus-ring-width: var(--border-focus);
-  --focus-ring-radius: var(--radius-md);
   --focus-ring-color: var(--color-primary-500);
   --focus-ring: 0 0 0 2px var(--focus-ring-color);
 
