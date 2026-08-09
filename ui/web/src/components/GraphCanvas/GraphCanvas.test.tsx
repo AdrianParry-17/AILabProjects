@@ -159,10 +159,26 @@ describe("GraphCanvas", () => {
     );
     const { container } = render(<GraphCanvas />);
     screen.getByTestId("graph-canvas");
-    const rAF = vi.spyOn(window, "requestAnimationFrame");
     const realMatchMedia = window.matchMedia;
     const query = { matches: true, media: "", onchange: null, addListener() {}, removeListener() {}, addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false };
     window.matchMedia = vi.fn(() => query) as unknown as typeof window.matchMedia;
+
+    // Vitest 4 fake timers no longer flush chained rAF callbacks the way the
+    // fit transition expects, so the animation loop is driven explicitly:
+    // requestAnimationFrame just records the next tick, and the test fires each
+    // tick with a fake performance clock that advances 16ms per frame.
+    let frame: FrameRequestCallback | null = null;
+    const rAF = vi
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((cb) => {
+        frame = cb;
+        return 1;
+      });
+    const tick = () => {
+      const cb = frame;
+      frame = null;
+      act(() => cb?.(performance.now()));
+    };
 
     try {
       const baselineHTML = container.querySelector("g")?.outerHTML ?? "";
@@ -176,18 +192,23 @@ describe("GraphCanvas", () => {
       // Normal motion: Fit animates via rAF and lands exactly on IDLE.
       query.matches = false;
       vi.useFakeTimers({ toFake: ["performance", "requestAnimationFrame"] });
-      try {
-        act(() => screen.getByRole("button", { name: "Zoom In" }).click());
-        act(() => screen.getByRole("button", { name: /Fit Graph/i }).click());
-        expect(rAF).toHaveBeenCalled();
-        act(() => vi.advanceTimersByTime(110));
-        expect(container.querySelector("g")?.outerHTML).not.toBe(baselineHTML);
-        act(() => vi.advanceTimersByTime(120));
-        expect(container.querySelector("g")?.outerHTML).toBe(baselineHTML);
-      } finally {
-        vi.useRealTimers();
+      act(() => screen.getByRole("button", { name: "Zoom In" }).click());
+      act(() => screen.getByRole("button", { name: /Fit Graph/i }).click());
+      expect(rAF).toHaveBeenCalled();
+      // Mid-flight: still animating (not yet back on the IDLE state).
+      for (let i = 0; i < 7; i += 1) {
+        act(() => vi.advanceTimersByTime(16));
+        tick();
       }
+      expect(container.querySelector("g")?.outerHTML).not.toBe(baselineHTML);
+      // Pump past FIT_DURATION_MS (220ms); the last frame must land exactly on IDLE.
+      while (frame !== null && performance.now() < 400) {
+        act(() => vi.advanceTimersByTime(16));
+        tick();
+      }
+      expect(container.querySelector("g")?.outerHTML).toBe(baselineHTML);
     } finally {
+      vi.useRealTimers();
       rAF.mockRestore();
       window.matchMedia = realMatchMedia;
     }
