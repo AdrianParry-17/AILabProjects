@@ -22,6 +22,39 @@ export function compactNumber(value?: number): string {
   return new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 2 }).format(value);
 }
 
+const NODE_KIND_LABELS: Record<string, string> = {
+  hospital: "Bệnh viện",
+  supermarket: "Siêu thị",
+  university: "Trường đại học",
+  market: "Chợ",
+  bus_station: "Bến xe buýt",
+  bridge: "Cầu",
+  gateway: "Nút kết nối",
+  intersection: "Giao lộ",
+};
+
+export function formatNodeKind(value?: string): string {
+  if (!value) return "Điểm giao nhận";
+  const normalized = value.replace(/^delivery_/, "");
+  return NODE_KIND_LABELS[normalized] || normalized.replaceAll("_", " ");
+}
+
+const COST_COMPONENT_LABELS: Record<string, string> = {
+  distance: "Khoảng cách",
+  distance_cost: "Khoảng cách",
+  time: "Thời gian",
+  time_cost: "Thời gian",
+  travel_time: "Thời gian",
+  congestion: "Ùn tắc",
+  congestion_cost: "Ùn tắc",
+  risk: "Rủi ro",
+  risk_cost: "Rủi ro",
+};
+
+export function formatCostComponent(value: string): string {
+  return COST_COMPONENT_LABELS[value] || value.replaceAll("_", " ");
+}
+
 export function explanationParts(explanation: SearchResponse["explanation"] | undefined) {
   if (!explanation) return { summary: "Chưa có kết quả để giải thích.", reasons: [], warnings: [] };
   if (typeof explanation === "string") return { summary: explanation, reasons: [], warnings: [] };

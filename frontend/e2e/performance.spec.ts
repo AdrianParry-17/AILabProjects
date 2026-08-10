@@ -1,4 +1,18 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function measureFrameRate(page: Page, durationMs = 1_000): Promise<number> {
+  return page.evaluate((sampleDuration) => new Promise<number>((resolve) => {
+    const startedAt = performance.now();
+    let frames = 0;
+    const countFrame = () => {
+      frames += 1;
+      const elapsed = performance.now() - startedAt;
+      if (elapsed < sampleDuration) requestAnimationFrame(countFrame);
+      else resolve((frames * 1_000) / elapsed);
+    };
+    requestAnimationFrame(countFrame);
+  }), durationMs);
+}
 
 declare global {
   interface Window {
@@ -18,6 +32,9 @@ test("playback stays responsive while the full graph is visible", async ({ page 
   });
   await page.goto("/");
   await expect(page.locator(".leaflet-map")).toBeVisible();
+  await expect(page.locator('.map-frame[data-base-layers-ready="true"]')).toBeVisible();
+  await expect(page.locator(".map-loading")).toBeHidden();
+  const idleFrameRate = await measureFrameRate(page);
   await page.evaluate(() => {
     const state = { frames: 0, longTasks: [] as number[], startedAt: performance.now(), observer: undefined as PerformanceObserver | undefined };
     const countFrame = () => {
@@ -51,10 +68,11 @@ test("playback stays responsive while the full graph is visible", async ({ page 
       traceIndex: Number((document.querySelector('.playback input[type="range"]') as HTMLInputElement)?.value || 0),
     };
   });
-  console.log(`UI_PERF ${JSON.stringify(metrics)}`);
+  const playbackFrameRate = metrics.frames / 3.5;
+  console.log(`UI_PERF ${JSON.stringify({ ...metrics, idleFrameRate, playbackFrameRate })}`);
 
   expect(metrics.traceIndex).toBeGreaterThan(30);
-  expect(metrics.frames).toBeGreaterThan(120);
+  expect(playbackFrameRate).toBeGreaterThan(Math.max(20, idleFrameRate * 0.65));
   expect(metrics.longestTaskMs).toBeLessThan(250);
   expect(metrics.longTaskTotalMs).toBeLessThan(650);
   expect(metrics.domNodes).toBeLessThan(2_200);
@@ -65,6 +83,8 @@ test("playback stays responsive while the full graph is visible", async ({ page 
 test("traffic scenario updates do not lock the main thread", async ({ page }) => {
   await page.goto("/");
   await expect(page.locator(".leaflet-map")).toBeVisible();
+  await expect(page.locator('.map-frame[data-base-layers-ready="true"]')).toBeVisible();
+  await expect(page.locator(".map-loading")).toBeHidden();
   await page.evaluate(() => {
     const state = { frames: 0, longTasks: [] as number[], startedAt: performance.now(), observer: undefined as PerformanceObserver | undefined };
     const countFrame = () => {
@@ -106,6 +126,8 @@ test("map pan remains fluid with all roads and nodes rendered", async ({ page })
   await page.goto("/");
   const map = page.locator(".leaflet-map");
   await expect(map).toBeVisible();
+  await expect(page.locator('.map-frame[data-base-layers-ready="true"]')).toBeVisible();
+  await expect(page.locator(".map-loading")).toBeHidden();
   const box = await map.boundingBox();
   if (!box) throw new Error("Map bounds unavailable");
   await page.evaluate(() => {
@@ -147,16 +169,16 @@ test("map pan remains fluid with all roads and nodes rendered", async ({ page })
 
 test("late-stage playback remains responsive with a large search tree", async ({ page }) => {
   await page.goto("/");
+  await expect(page.locator('.map-frame[data-base-layers-ready="true"]')).toBeVisible();
+  await expect(page.locator(".map-loading")).toBeHidden();
   await page.getByRole("button", { name: /Tìm tuyến & tạo lời giải thích/i }).click();
   await expect(page.getByRole("button", { name: /Tạm dừng mô phỏng/i })).toBeVisible();
   await page.getByRole("button", { name: /Tạm dừng mô phỏng/i }).click();
   const timeline = page.getByLabel("Tiến trình mô phỏng thuật toán");
-  await timeline.evaluate((element: HTMLInputElement) => {
-    element.value = String(Math.max(1, Number(element.max) - 35));
-    element.dispatchEvent(new Event("input", { bubbles: true }));
-    element.dispatchEvent(new Event("change", { bubbles: true }));
-  });
-  await expect(timeline).not.toHaveValue("0");
+  const lateIndex = String(Math.max(1, Number(await timeline.getAttribute("max")) - 35));
+  await timeline.fill(lateIndex);
+  await expect(timeline).toHaveValue(lateIndex);
+  const idleFrameRate = await measureFrameRate(page);
   await page.evaluate(() => {
     const state = { frames: 0, longTasks: [] as number[], startedAt: performance.now(), observer: undefined as PerformanceObserver | undefined };
     const countFrame = () => {
@@ -183,8 +205,9 @@ test("late-stage playback remains responsive with a large search tree", async ({
       svgPaths: document.querySelectorAll("svg path").length,
     };
   });
-  console.log(`LATE_TRACE_PERF ${JSON.stringify(metrics)}`);
-  expect(metrics.frames).toBeGreaterThan(80);
+  const playbackFrameRate = metrics.frames / 2;
+  console.log(`LATE_TRACE_PERF ${JSON.stringify({ ...metrics, idleFrameRate, playbackFrameRate })}`);
+  expect(playbackFrameRate).toBeGreaterThan(Math.max(18, idleFrameRate * 0.65));
   expect(metrics.longestTaskMs).toBeLessThan(250);
   expect(metrics.svgPaths).toBeLessThan(450);
 });

@@ -7,17 +7,26 @@ import {
   Cpu,
   Gauge,
   Milestone,
+  PackageCheck,
   Route,
   ShieldCheck,
   Sparkles,
   TrafficCone,
 } from "lucide-react";
 import type { MultiRouteResponse, SearchResponse } from "../types";
-import { compactNumber, explanationParts, formatDistance, formatRuntime, formatTime } from "../lib/format";
+import { compactNumber, explanationParts, formatCostComponent, formatDistance, formatRuntime, formatTime } from "../lib/format";
 
 interface Props {
   result?: SearchResponse | MultiRouteResponse;
   selectedPathNames?: string[];
+  deliveryLegs?: Array<{
+    index: number;
+    from: string;
+    to: string;
+    distanceM: number;
+    timeMin: number;
+    cost: number;
+  }>;
 }
 
 function MetricCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: string }) {
@@ -29,13 +38,15 @@ function MetricCard({ icon, label, value, tone }: { icon: React.ReactNode; label
   );
 }
 
-export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathNames }: Props) {
+export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathNames, deliveryLegs = [] }: Props) {
   const metrics = result?.metrics;
   const explanation = explanationParts(result?.explanation as SearchResponse["explanation"]);
   const pathNames = selectedPathNames || (result && "path_names" in result ? result.path_names : undefined) || (result && "order_names" in result ? result.order_names : undefined) || [];
   const breakdown = result && "cost_breakdown" in result ? result.cost_breakdown : undefined;
   const alternative = result && "alternative" in result ? result.alternative : undefined;
   const found = result?.found;
+  const statusClass = !result ? "idle" : found ? "success" : "failed";
+  const statusText = !result ? "Chờ chạy" : found ? "Đã tìm thấy tuyến" : "Không có tuyến khả dụng";
 
   return (
     <aside className="insights-panel panel">
@@ -44,8 +55,8 @@ export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathN
           <span className="section-kicker">ROUTE INTELLIGENCE</span>
           <h2>Phân tích kết quả</h2>
         </div>
-        <span className={`status-pill ${found ? "success" : "idle"}`}>
-          <Activity size={13} /> {found ? "Route found" : "Awaiting run"}
+        <span className={`status-pill ${statusClass}`}>
+          <Activity size={13} /> {statusText}
         </span>
       </div>
 
@@ -66,8 +77,23 @@ export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathN
               <span key={`${name}-${index}`}><i>{index + 1}</i>{name}</span>
             ))}
           </div>
-        ) : <div className="empty-route">Tuyến tối ưu sẽ được vẽ và liệt kê sau khi chạy.</div>}
+        ) : <div className="empty-route">{result && !found ? "Search đã hoàn tất nhưng không có tuyến đi được với cấu hình hiện tại." : "Tuyến sẽ được vẽ và liệt kê sau khi chạy."}</div>}
       </div>
+
+      {deliveryLegs.length > 0 && (
+        <div className="delivery-legs-card">
+          <div className="subheading-row"><span><PackageCheck size={15} /> Chi tiết từng chặng giao</span><small>{deliveryLegs.length} chặng</small></div>
+          <div className="delivery-leg-list">
+            {deliveryLegs.map((leg) => (
+              <div className="delivery-leg" key={`${leg.index}-${leg.from}-${leg.to}`}>
+                <i>{leg.index}</i>
+                <span><strong>{leg.from}</strong><small>đến {leg.to}</small></span>
+                <b>{formatDistance(leg.distanceM)} · {formatTime(leg.timeMin)} · cost {compactNumber(leg.cost)}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="explanation-card">
         <div className="explanation-title"><Sparkles size={16} /> Vì sao chọn tuyến này?</div>
@@ -91,7 +117,7 @@ export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathN
               const width = Math.min(100, Math.max(3, ((value || 0) / total) * 100));
               return (
                 <div className="breakdown-row" key={key}>
-                  <span>{key.replaceAll("_", " ")}</span>
+                  <span>{formatCostComponent(key)}</span>
                   <div><i style={{ width: `${width}%`, background: colors[index % colors.length] }} /></div>
                   <b>{compactNumber(value)}</b>
                 </div>

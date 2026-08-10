@@ -1,6 +1,6 @@
 export type PlannerMode = "route" | "multi" | "compare" | "learn";
 export type TrafficScenario = "normal" | "rush_hour" | "rain" | "flood" | "night" | string;
-export type Objective = "balanced" | "distance" | "time" | "safety" | "emergency" | string;
+export type Objective = "balanced" | "distance" | "time" | "safety" | "priority_delivery" | string;
 
 export interface CostWeights {
   distance: number;
@@ -18,7 +18,9 @@ export interface GraphNode {
   lon: number;
   district?: string;
   address?: string;
-  is_hospital?: boolean;
+  is_delivery_point?: boolean;
+  poi_category?: string;
+  routing_component?: "primary" | "peripheral" | string;
   tags?: Record<string, string | number | boolean>;
 }
 
@@ -36,6 +38,7 @@ export interface GraphEdge {
   direction?: "one_way" | "two_way" | string;
   oneway?: boolean;
   closed?: boolean;
+  traversable?: boolean;
   speed_kph?: number;
   flags?: string[];
   geometry?: [number, number][];
@@ -109,6 +112,7 @@ export interface TraceStep {
   current_name?: string;
   phase?: "start" | "expand" | "iteration" | "finish";
   is_complete?: boolean;
+  trace_truncated?: boolean;
   found?: boolean;
   parent_id?: string;
   active_edge_id?: string;
@@ -204,7 +208,6 @@ export interface SearchRequest {
   objective: string;
   scenario: string;
   weights: CostWeights;
-  vehicle?: string;
   avoid_flags?: string[];
   trace?: boolean;
 }
@@ -220,11 +223,24 @@ export interface MultiRouteResponse {
   method: string;
   order: string[];
   order_names?: string[];
-  segments: SearchResponse[];
+  segments: MultiRouteSegment[];
   route_geojson?: RouteGeoJson;
   metrics: RouteMetrics;
+  cost_breakdown?: CostBreakdown;
   explanation: string | { summary?: string; reasons?: string[]; warnings?: string[]; optimality?: string };
   optimality?: string;
   original_order?: string[];
   improvement_percent?: number;
+}
+
+export interface MultiRouteSegment {
+  from_id: string;
+  to_id: string;
+  path: string[];
+  edge_ids: string[];
+  route_geojson?: RouteGeoJson;
+  cost_breakdown?: CostBreakdown;
+  distance_m?: number;
+  travel_time_min?: number;
+  total_cost?: number;
 }

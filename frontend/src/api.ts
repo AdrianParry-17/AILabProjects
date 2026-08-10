@@ -96,7 +96,7 @@ function normalizeMetadata(raw: any): MetadataPayload {
       { id: "distance", name: "Ngắn nhất theo khoảng cách", description: "Ưu tiên distance." },
       { id: "time", name: "Nhanh nhất theo ETA", description: "Ưu tiên travel time và delay." },
       { id: "safety", name: "Rủi ro thấp nhất", description: "Phạt mạnh exposure/risk." },
-      { id: "emergency", name: "Emergency response", description: "ETA cao nhất, vẫn tránh incident/risk." },
+      { id: "priority_delivery", name: "Giao ưu tiên", description: "Ưu tiên ETA và độ trễ cho đơn cần giao sớm." },
       { id: "custom", name: "Custom weights", description: "Điều chỉnh trực tiếp bằng sliders." },
     ],
     multi_algorithms: (raw.multi_route_methods || []).map((item: any) => ({
@@ -132,6 +132,19 @@ function congestionLevel(traffic: any): number {
   return Math.min(5, Math.max(byLabel, byMultiplier));
 }
 
+export interface TrafficOverlay {
+  scenario: string;
+  edges: Array<{
+    edge_id: string;
+    multiplier: number;
+    effective_speed_kph: number;
+    travel_time_s?: number;
+    congestion: string;
+    level: number;
+    closed: boolean;
+  }>;
+}
+
 function friendlyLocationName(value: unknown): string {
   const name = String(value || "").trim();
   if (!name || /^osm[_\s-]/i.test(name) || /giao\s+lộ\s+osm\s+\d+/i.test(name)) {
@@ -143,8 +156,8 @@ function friendlyLocationName(value: unknown): string {
 function normalizeGraph(raw: any): GraphPayload {
   const box = raw.summary?.bounding_box;
   return {
-    name: raw.dataset?.name || "Đà Nẵng emergency graph",
-    city: raw.dataset?.city || "Đà Nẵng",
+    name: raw.dataset?.name || "HCMC delivery graph",
+    city: raw.dataset?.city || "Thành phố Hồ Chí Minh",
     description: raw.dataset?.description,
     source: raw.dataset?.source,
     generated_at: raw.dataset?.generated_at,
@@ -152,6 +165,7 @@ function normalizeGraph(raw: any): GraphPayload {
     bounds: box ? [[box.south, box.west], [box.north, box.east]] : undefined,
     scenario: raw.scenario?.id,
     stats: {
+      ...(raw.dataset?.stats || {}),
       node_count: raw.summary?.node_count,
       directed_edge_count: raw.summary?.directed_edge_count,
       max_speed_kph: raw.summary?.max_speed_kph,
@@ -160,7 +174,9 @@ function normalizeGraph(raw: any): GraphPayload {
       ...node,
       name: friendlyLocationName(node.name),
       short_name: friendlyLocationName(node.short_name || node.name),
-      is_hospital: node.kind === "hospital" || Boolean(node.attributes?.emergency_destination),
+      is_delivery_point: node.kind?.startsWith("delivery_") || Boolean(node.attributes?.delivery_destination),
+      poi_category: node.attributes?.delivery_category || String(node.kind || "").replace(/^delivery_/, ""),
+      routing_component: node.attributes?.routing_component,
       district: node.attributes?.district,
       address: node.attributes?.address,
       tags: node.attributes,
@@ -176,9 +192,10 @@ function normalizeGraph(raw: any): GraphPayload {
       travel_time_min: edge.traffic?.travel_time_s == null ? undefined : edge.traffic.travel_time_s / 60,
       congestion: congestionLevel(edge.traffic),
       risk: edge.risk,
-      direction: "one_way",
-      oneway: true,
+      direction: String(edge.direction || edge.attributes?.source_direction || "directed").replace("-", "_"),
+      oneway: !["two-way", "two_way"].includes(String(edge.direction || edge.attributes?.source_direction)),
       closed: edge.traffic?.closed,
+      traversable: edge.traversable !== false,
       speed_kph: edge.traffic?.effective_speed_kph ?? edge.speed_kph,
       flags: [
         edge.attributes?.bridge && "cầu",
@@ -221,8 +238,15 @@ const ALGORITHM_LABELS: Record<string, string> = {
   dijkstra: "Dijkstra",
   astar: "A* Search",
   greedy_best_first: "Greedy Best-First",
-  bidirectional: "Bidirectional Search",
+  bidirectional_dijkstra: "Bidirectional Dijkstra",
   ida_star: "IDA*",
+};
+
+const MULTI_METHOD_LABELS: Record<string, string> = {
+  nearest_neighbor: "Nearest Neighbor",
+  two_opt: "Nearest Neighbor + 2-opt",
+  held_karp: "Held–Karp",
+  simulated_annealing: "Simulated Annealing",
 };
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -248,10 +272,9 @@ function heuristicLabel(value?: string): string {
 }
 
 function optimalityCopy(algorithm: string, heuristic?: string): string {
-  if (["ucs", "dijkstra"].includes(algorithm)) return "Bảo đảm tối ưu khi mọi chi phí cạnh đều không âm.";
-  if (algorithm === "astar") return `Bảo đảm tối ưu khi heuristic ${heuristicLabel(heuristic)} là admissible và consistent.`;
+  if (["ucs", "dijkstra", "bidirectional_dijkstra"].includes(algorithm)) return "Bảo đảm tối ưu khi mọi chi phí cạnh đều không âm.";
+  if (["astar", "ida_star"].includes(algorithm)) return `Bảo đảm tối ưu khi heuristic ${heuristicLabel(heuristic)} là admissible và consistent.`;
   if (algorithm === "bfs") return "Tối ưu số chặng, nhưng không nhất thiết tối ưu tổng chi phí có trọng số.";
-  if (algorithm === "bidirectional") return "Tối ưu theo điều kiện của chiến lược tìm kiếm hai chiều đang dùng.";
   return "Ưu tiên tốc độ khám phá; không bảo đảm tìm được tuyến có tổng chi phí nhỏ nhất.";
 }
 
@@ -297,16 +320,21 @@ interface PendingTraceFrame {
 
 /** Convert noisy backend events into one meaningful frame per node expansion. */
 function normalizeTrace(raw: any, found: boolean): TraceStep[] {
+  const visualNodeLimit = 260;
+  const visualEdgeLimit = 300;
   const events = raw?.events || [];
   const frames: TraceStep[] = [];
   const visited = new Set<string>();
+  const visitedOrder: string[] = [];
   const frontier = new Set<string>();
   const parentByNode = new Map<string, string>();
   const edgeByNode = new Map<string, string>();
-  const linkByNode = new Map<string, { source: string; target: string; edge_id?: string }>();
   const exploredEdges = new Set<string>();
+  const exploredEdgeOrder: string[] = [];
   const frontierEdges = new Set<string>();
   let pending: PendingTraceFrame | undefined;
+  const setTail = <T,>(values: Set<T>, limit: number): T[] => [...values].slice(-limit);
+  const arrayTail = <T,>(values: T[], limit: number): T[] => values.slice(-limit);
 
   const snapshot = (frame: PendingTraceFrame, reason: string): TraceStep => ({
     step: frames.length,
@@ -317,13 +345,10 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
     parent_id: frame.parent_id,
     active_edge_id: frame.active_edge_id,
     active_link: frame.parent_id ? { source: frame.parent_id, target: frame.current, edge_id: frame.active_edge_id } : undefined,
-    explored_edge_ids: [...exploredEdges],
-    frontier_edge_ids: [...frontierEdges],
-    explored_links: [...visited].flatMap((node) => linkByNode.get(node) ? [linkByNode.get(node)!] : []),
-    frontier_links: [...frontier].flatMap((node) => linkByNode.get(node) ? [linkByNode.get(node)!] : []),
-    frontier: [...frontier],
-    visited: [...visited],
-    explored: [...visited],
+    explored_edge_ids: arrayTail(exploredEdgeOrder, visualEdgeLimit),
+    frontier_edge_ids: setTail(frontierEdges, visualEdgeLimit),
+    frontier: setTail(frontier, visualNodeLimit),
+    visited: arrayTail(visitedOrder, visualNodeLimit),
     newly_discovered: [...frame.newly_discovered],
     frontier_size: frontier.size,
     explored_count: visited.size,
@@ -356,7 +381,6 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
         phase: "start",
         frontier: [...frontier],
         visited: [],
-        explored: [],
         newly_discovered: [node],
         explored_edge_ids: [],
         frontier_edge_ids: [],
@@ -378,12 +402,11 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
         step: frames.length,
         current: node || frames.at(-1)?.current || "",
         phase: "iteration",
-        frontier: [...frontier],
-        visited: [...visited],
-        explored: [...visited],
+        frontier: setTail(frontier, visualNodeLimit),
+        visited: arrayTail(visitedOrder, visualNodeLimit),
         newly_discovered: [],
-        explored_edge_ids: [...exploredEdges],
-        frontier_edge_ids: [...frontierEdges],
+        explored_edge_ids: arrayTail(exploredEdgeOrder, visualEdgeLimit),
+        frontier_edge_ids: setTail(frontierEdges, visualEdgeLimit),
         frontier_size: frontier.size,
         explored_count: visited.size,
         f_score: event.f_cost,
@@ -396,11 +419,17 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
     if (kind === "expand" && node) {
       flushPending();
       frontier.delete(node);
-      visited.add(node);
+      if (!visited.has(node)) {
+        visited.add(node);
+        visitedOrder.push(node);
+      }
       const activeEdge = edgeByNode.get(node);
       if (activeEdge) {
         frontierEdges.delete(activeEdge);
-        exploredEdges.add(activeEdge);
+        if (!exploredEdges.has(activeEdge)) {
+          exploredEdges.add(activeEdge);
+          exploredEdgeOrder.push(activeEdge);
+        }
       }
       pending = {
         current: node,
@@ -419,13 +448,6 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
     if (["discover", "relax"].includes(kind) && node) {
       frontier.add(node);
       if (event.parent_id) parentByNode.set(node, String(event.parent_id));
-      if (event.parent_id) {
-        linkByNode.set(node, {
-          source: String(event.parent_id),
-          target: node,
-          edge_id: event.edge_id ? String(event.edge_id) : undefined,
-        });
-      }
       if (event.edge_id) {
         const edgeId = String(event.edge_id);
         const previousEdge = edgeByNode.get(node);
@@ -452,12 +474,11 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
           phase: "finish",
           is_complete: true,
           found,
-          frontier: [...frontier],
-          visited: [...visited],
-          explored: [...visited],
+          frontier: setTail(frontier, visualNodeLimit),
+          visited: arrayTail(visitedOrder, visualNodeLimit),
           newly_discovered: [],
-          explored_edge_ids: [...exploredEdges],
-          frontier_edge_ids: [...frontierEdges],
+          explored_edge_ids: arrayTail(exploredEdgeOrder, visualEdgeLimit),
+          frontier_edge_ids: setTail(frontierEdges, visualEdgeLimit),
           frontier_size: frontier.size,
           explored_count: visited.size,
           reason: "Hoàn tất tìm kiếm và dựng lại tuyến đường.",
@@ -468,7 +489,22 @@ function normalizeTrace(raw: any, found: boolean): TraceStep[] {
   }
   flushPending();
   if (frames.length && !frames.some((frame) => frame.is_complete)) {
-    frames[frames.length - 1] = { ...frames[frames.length - 1], phase: "finish", is_complete: true, found };
+    const last = frames[frames.length - 1];
+    const completion: TraceStep = {
+      ...last,
+      step: raw?.truncated ? frames.length : last.step,
+      phase: "finish",
+      is_complete: true,
+      found,
+      trace_truncated: Boolean(raw?.truncated),
+      newly_discovered: [],
+      reason: raw?.truncated
+        ? "Nhật ký trực quan đã đạt giới hạn; chuyển tới kết quả cuối do search engine trả về."
+        : "Hoàn tất tìm kiếm và dựng lại tuyến đường.",
+      action: "finish",
+    };
+    if (raw?.truncated) frames.push(completion);
+    else frames[frames.length - 1] = completion;
   }
   return frames;
 }
@@ -522,17 +558,43 @@ function normalizeMulti(raw: any): MultiRouteResponse {
   const method = raw.method?.id || raw.method;
   const metrics = normalizeMetrics(raw.metrics);
   const found = raw.status === "found";
+  const methodName = MULTI_METHOD_LABELS[method] || String(method || "Bộ tối ưu nhiều điểm").replaceAll("_", " ");
+  const optimality = method === "held_karp"
+    ? "Bảo đảm thứ tự ghé tối ưu cho số điểm dừng nằm trong giới hạn của Held–Karp."
+    : "Phương pháp heuristic ưu tiên thời gian chạy; không bảo đảm thứ tự ghé tối ưu toàn cục.";
+  const warnings = raw.explanation?.warnings?.length
+    ? ["Traffic, sự cố và mức rủi ro trong bản lab là dữ liệu mô phỏng theo kịch bản, không phải dữ liệu điều hành thời gian thực."]
+    : [];
   return {
     found,
     method,
     order: raw.stop_order || [],
-    segments: [],
+    segments: (raw.segments || []).map((segment: any) => ({
+      from_id: String(segment.from_id),
+      to_id: String(segment.to_id),
+      path: segment.path || [],
+      edge_ids: segment.edge_ids || [],
+      route_geojson: geoFeature(segment.route_geojson),
+      cost_breakdown: normalizeBreakdown(segment.cost_breakdown),
+      distance_m: Number(segment.cost_breakdown?.distance_m || 0),
+      travel_time_min: Number(segment.cost_breakdown?.travel_time_s || 0) / 60,
+      total_cost: Number(segment.cost_breakdown?.total_cost || 0),
+    })),
     route_geojson: geoFeature(raw.route_geojson),
     metrics,
-    explanation: normalizeExplanation(raw.explanation, { found, algorithm: method, scenario: raw.scenario?.id || raw.scenario, metrics }),
-    optimality: method === "held_karp"
-      ? "Bảo đảm tối ưu cho số điểm dừng nằm trong giới hạn của Held–Karp."
-      : "Phương pháp heuristic ưu tiên thời gian chạy; không bảo đảm thứ tự ghé tối ưu toàn cục.",
+    cost_breakdown: normalizeBreakdown(raw.cost_breakdown),
+    explanation: {
+      summary: found
+        ? `${methodName} đã sắp xếp ${raw.stop_order?.length || 0} điểm ghé thành hành trình dài ${(metrics.total_distance_m / 1000).toFixed(2)} km.`
+        : `${methodName} chưa tạo được hành trình khả dụng qua toàn bộ điểm ghé.`,
+      reasons: [
+        "Bộ tối ưu quyết định thứ tự ghé; mỗi chặng giữa hai điểm được dựng bằng Dijkstra trên cùng hàm chi phí.",
+        `Đã đánh giá ${metrics.generated_nodes || 0} lượt tìm kiếm cặp điểm và mở rộng tổng cộng ${metrics.explored_nodes || 0} nút.`,
+      ],
+      warnings,
+      optimality,
+    },
+    optimality,
     original_order: raw.requested_stop_ids || [],
   };
 }
@@ -540,7 +602,22 @@ function normalizeMulti(raw: any): MultiRouteResponse {
 export const trafficApi = {
   health: () => request<any>("/health"),
   metadata: async () => normalizeMetadata(await request<any>("/metadata")),
-  graph: async (scenario: TrafficScenario) => normalizeGraph(await request<any>(`/graph?scenario=${encodeURIComponent(scenario)}`)),
+  graph: async (scenario: TrafficScenario) => normalizeGraph(await request<any>(`/graph?scenario=${encodeURIComponent(scenario)}&include_geojson=false&compact=true`)),
+  traffic: async (scenario: TrafficScenario): Promise<TrafficOverlay> => {
+    const raw = await request<any>(`/traffic?scenario=${encodeURIComponent(scenario)}`);
+    return {
+      scenario: String(raw.scenario?.id || scenario),
+      edges: (raw.edges || []).map((status: any) => ({
+        edge_id: String(status.edge_id),
+        multiplier: Number(status.multiplier || 1),
+        effective_speed_kph: Number(status.effective_speed_kph || 0),
+        travel_time_s: status.travel_time_s == null ? undefined : Number(status.travel_time_s),
+        congestion: String(status.congestion || "light"),
+        level: congestionLevel(status),
+        closed: Boolean(status.closed),
+      })),
+    };
+  },
   search: async (body: SearchRequest) => normalizeSearch(await request<any>("/search", {
     method: "POST",
     body: JSON.stringify({
@@ -551,7 +628,7 @@ export const trafficApi = {
       scenario: body.scenario,
       cost_weights: toApiWeights(body.weights),
       include_trace: body.trace ?? true,
-      max_trace_events: 2_000,
+      max_trace_events: 1_200,
       max_expansions: 100_000,
       include_alternative: true,
     }),
@@ -565,8 +642,8 @@ export const trafficApi = {
       heuristic: body.heuristic === "auto" ? "travel_time" : body.heuristic,
       scenario: body.scenario,
       cost_weights: toApiWeights(body.weights),
-      include_trace: true,
-      max_trace_events: 500,
+      include_trace: false,
+      max_trace_events: 0,
       max_expansions: 100_000,
     }),
   })),

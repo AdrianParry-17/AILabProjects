@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { ApiError, trafficApi } from "./api";
@@ -15,6 +15,7 @@ import { DEFAULT_WEIGHTS } from "./lib/format";
 import type {
   CompareResponse,
   CostWeights,
+  GraphPayload,
   MetadataPayload,
   MultiRouteResponse,
   PlannerMode,
@@ -44,7 +45,7 @@ const FALLBACK_METADATA: MetadataPayload = {
     { id: "distance", name: "Ngắn nhất theo khoảng cách" },
     { id: "time", name: "Nhanh nhất theo ETA" },
     { id: "safety", name: "Rủi ro thấp nhất" },
-    { id: "emergency", name: "Emergency response" },
+    { id: "priority_delivery", name: "Giao ưu tiên" },
   ],
   scenarios: [
     { id: "normal", name: "Bình thường" },
@@ -102,30 +103,61 @@ export default function App() {
   const metadataQuery = useQuery({ queryKey: ["metadata"], queryFn: trafficApi.metadata });
   const metadata = metadataQuery.data || FALLBACK_METADATA;
   const graphQuery = useQuery({
-    queryKey: ["graph", scenario],
-    queryFn: () => trafficApi.graph(scenario),
-    placeholderData: keepPreviousData,
+    queryKey: ["graph", "topology"],
+    queryFn: () => trafficApi.graph("normal"),
+    staleTime: Infinity,
+  });
+  const trafficQuery = useQuery({
+    queryKey: ["traffic", scenario],
+    queryFn: () => trafficApi.traffic(scenario),
+    enabled: scenario !== "normal",
     staleTime: 5 * 60_000,
   });
-  const graph = graphQuery.data;
+  const graphSnapshot = graphQuery.data;
+  const [graph, setGraph] = useState<GraphPayload>();
+  const graphError = graphQuery.error || trafficQuery.error;
+  const graphLoading = !graph || graphQuery.isFetching || (scenario !== "normal" && trafficQuery.isFetching);
 
   useEffect(() => {
-    if (!graph?.nodes.length) return;
-    if (!start) {
-      const incident = graph.nodes.find((node) => !node.is_hospital && node.kind !== "hospital") || graph.nodes[0];
-      setStart(incident.id);
-    }
-    if (!goal) {
-      const hospital = graph.nodes.find((node) => node.is_hospital || node.kind === "hospital") || graph.nodes.at(-1)!;
-      if (hospital.id !== start) setGoal(hospital.id);
-    }
-  }, [graph, start, goal]);
+    if (!graphSnapshot?.nodes.length) return;
+    let cancelled = false;
+    const frame = window.requestAnimationFrame(() => {
+      if (cancelled) return;
+      const primaryDeliveryPoints = graphSnapshot.nodes.filter(
+      (node) => node.is_delivery_point && node.routing_component === "primary",
+      );
+      const recommendedStart = String(graphSnapshot.stats?.recommended_start_id || "");
+      const recommendedGoal = String(graphSnapshot.stats?.recommended_goal_id || "");
+      const pickup = graphSnapshot.nodes.find((node) => node.id === recommendedStart)
+        || primaryDeliveryPoints[0]
+        || graphSnapshot.nodes[0];
+      const dropoff = graphSnapshot.nodes.find((node) => node.id === recommendedGoal)
+        || primaryDeliveryPoints.find((node) => node.id !== pickup.id)
+        || graphSnapshot.nodes.find((node) => node.id !== pickup.id);
+      setStart((current) => graphSnapshot.nodes.some((node) => node.id === current) ? current : pickup.id);
+      if (dropoff) {
+        setGoal((current) => graphSnapshot.nodes.some((node) => node.id === current && node.id !== pickup.id) ? current : dropoff.id);
+      }
+      setGraph(graphSnapshot);
+    });
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(frame);
+    };
+  }, [graphSnapshot]);
 
-  const baseRequest = { start, goal, algorithm, heuristic, objective, scenario, weights, vehicle: "ambulance", trace: true };
+  const baseRequest = { start, goal, algorithm, heuristic, objective, scenario, weights, trace: true };
+  const routeFingerprint = JSON.stringify(baseRequest);
+  const compareFingerprint = JSON.stringify({ ...baseRequest, algorithms: comparisonAlgorithms });
+  const multiFingerprint = JSON.stringify({ start, stops, returnToStart, multiMethod, algorithm, heuristic, objective, scenario, weights });
+  const currentRequestRef = useRef({ route: routeFingerprint, compare: compareFingerprint, multi: multiFingerprint });
+  currentRequestRef.current = { route: routeFingerprint, compare: compareFingerprint, multi: multiFingerprint };
+  const submittedRequestRef = useRef({ route: "", compare: "", multi: "" });
 
   const routeMutation = useMutation({
     mutationFn: () => trafficApi.search(baseRequest),
     onSuccess: (data) => {
+      if (submittedRequestRef.current.route !== currentRequestRef.current.route) return;
       setRouteResult(data);
       setTraceIndex(0);
       setPlaying(Boolean(data.trace.length));
@@ -134,6 +166,7 @@ export default function App() {
   const compareMutation = useMutation({
     mutationFn: () => trafficApi.compare({ ...baseRequest, algorithms: comparisonAlgorithms }),
     onSuccess: (data) => {
+      if (submittedRequestRef.current.compare !== currentRequestRef.current.compare) return;
       setCompareResult(data);
       setTraceIndex(0);
       setPlaying(false);
@@ -152,6 +185,7 @@ export default function App() {
       weights,
     }),
     onSuccess: (data) => {
+      if (submittedRequestRef.current.multi !== currentRequestRef.current.multi) return;
       setMultiResult(data);
       setTraceIndex(0);
       setPlaying(false);
@@ -185,47 +219,61 @@ export default function App() {
       return {
         ...step,
         current_name: currentName,
-        frontier_names: step.frontier.map((id) => nameById.get(id) || "Giao lộ chưa đặt tên"),
         reason,
       };
     });
     if ("trace" in displayResult) return enrich(displayResult.trace || []);
-    if ("segments" in displayResult) {
-      let offset = 0;
-      return enrich(displayResult.segments.flatMap((segment, segmentIndex) => segment.trace.map((step) => ({
-        ...step,
-        step: offset++ ,
-        reason: `Chặng ${segmentIndex + 1}: ${step.reason}`,
-      }))));
-    }
+    if ("segments" in displayResult) return [];
     return [];
   }, [displayResult, graph]);
 
+  const traceIndexRef = useRef(traceIndex);
+  traceIndexRef.current = traceIndex;
   useEffect(() => {
-    if (!playing || !trace.length) return;
-    const adaptiveDelay = Math.max(18, Math.round(playbackSpeed * (trace.length > 320 ? 0.42 : trace.length > 180 ? 0.62 : trace.length > 90 ? 0.78 : 1)));
-    const timer = window.setTimeout(() => {
-      setTraceIndex((current) => {
-        if (current >= trace.length - 1) {
-          setPlaying(false);
-          return current;
+    if (!playing || trace.length < 2) return;
+    const lengthScale = trace.length > 700 ? 0.34 : trace.length > 400 ? 0.5 : trace.length > 220 ? 0.68 : 1;
+    const millisecondsPerStep = Math.max(7, playbackSpeed * lengthScale);
+    const visualCadenceMs = trace.length > 220 ? 80 : millisecondsPerStep;
+    let frame = 0;
+    let previousTime = performance.now();
+    let previousVisualTime = previousTime;
+    let accumulated = 0;
+    let logicalIndex = traceIndexRef.current;
+    const advancePlayback = (currentTime: number) => {
+      accumulated += Math.min(500, currentTime - previousTime);
+      previousTime = currentTime;
+      const stepCount = Math.floor(accumulated / millisecondsPerStep);
+      if (stepCount > 0) {
+        accumulated -= stepCount * millisecondsPerStep;
+        logicalIndex = Math.min(trace.length - 1, logicalIndex + stepCount);
+        if (currentTime - previousVisualTime >= visualCadenceMs || logicalIndex >= trace.length - 1) {
+          previousVisualTime = currentTime;
+          traceIndexRef.current = logicalIndex;
+          setTraceIndex(logicalIndex);
         }
-        return current + 1;
-      });
-    }, playbackSpeed);
-    return () => window.clearTimeout(timer);
-  }, [playing, playbackSpeed, trace.length, traceIndex]);
+        if (logicalIndex >= trace.length - 1) {
+          setPlaying(false);
+          return;
+        }
+      }
+      frame = window.requestAnimationFrame(advancePlayback);
+    };
+    frame = window.requestAnimationFrame(advancePlayback);
+    return () => window.cancelAnimationFrame(frame);
+  }, [playing, playbackSpeed, trace.length]);
 
   useEffect(() => {
     setPlaying(false);
     setTraceIndex(0);
-  }, [mode, scenario]);
-
-  useEffect(() => {
     setRouteResult(undefined);
     setCompareResult(undefined);
     setMultiResult(undefined);
-  }, [scenario]);
+  }, [start, goal, stops.join("|"), algorithm, heuristic, objective, scenario, weights.distance, weights.time, weights.congestion, weights.risk, comparisonAlgorithms.join("|"), multiMethod, returnToStart]);
+
+  useEffect(() => {
+    setPlaying(false);
+    setTraceIndex(0);
+  }, [mode]);
 
   const handleMapSelect = useCallback((id: string) => {
     if (selectionTarget === "start") {
@@ -234,9 +282,10 @@ export default function App() {
     } else if (selectionTarget === "goal") {
       if (id !== start) setGoal(id);
     } else if (id !== start) {
-      setStops((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length < 10 ? [...current, id] : current);
+      const stopLimit = multiMethod === "held_karp" ? 10 : 12;
+      setStops((current) => current.includes(id) ? current.filter((item) => item !== id) : current.length < stopLimit ? [...current, id] : current);
     }
-  }, [selectionTarget, mode, start]);
+  }, [selectionTarget, mode, start, multiMethod]);
 
   const handleMode = useCallback((next: PlannerMode) => {
     setMode(next);
@@ -250,7 +299,7 @@ export default function App() {
       distance: { distance: 5, time: 0.4, congestion: 0.2, risk: 0.2 },
       time: { distance: 0.4, time: 5, congestion: 2.8, risk: 0.4 },
       safety: { distance: 0.4, time: 1, congestion: 1.7, risk: 5 },
-      emergency: { distance: 0.7, time: 5, congestion: 3.2, risk: 2.2 },
+      priority_delivery: { distance: 0.7, time: 5, congestion: 3.2, risk: 2.2 },
     };
     if (presets[next]) setWeights(presets[next]);
   }, []);
@@ -262,10 +311,17 @@ export default function App() {
 
   const run = useCallback(() => {
     setPlaying(false);
-    if (mode === "compare") compareMutation.mutate();
-    else if (mode === "multi") multiMutation.mutate();
-    else routeMutation.mutate();
-  }, [mode, compareMutation.mutate, multiMutation.mutate, routeMutation.mutate]);
+    if (mode === "compare") {
+      submittedRequestRef.current.compare = compareFingerprint;
+      compareMutation.mutate();
+    } else if (mode === "multi") {
+      submittedRequestRef.current.multi = multiFingerprint;
+      multiMutation.mutate();
+    } else {
+      submittedRequestRef.current.route = routeFingerprint;
+      routeMutation.mutate();
+    }
+  }, [mode, compareFingerprint, multiFingerprint, routeFingerprint, compareMutation.mutate, multiMutation.mutate, routeMutation.mutate]);
 
   const activeMutation = mode === "compare" ? compareMutation : mode === "multi" ? multiMutation : routeMutation;
   const scenarioName = metadata.scenarios.find((item) => item.id === scenario)?.name || scenario;
@@ -278,6 +334,18 @@ export default function App() {
     }
     return displayResult.path.map((id) => safeNodeName(nameById.get(id)));
   }, [displayResult, graph, start, returnToStart]);
+  const deliveryLegs = useMemo(() => {
+    if (mode !== "multi" || !multiResult || !graph) return [];
+    const nameById = new Map(graph.nodes.map((node) => [node.id, safeNodeName(node.name)]));
+    return multiResult.segments.map((segment, index) => ({
+      index: index + 1,
+      from: nameById.get(segment.from_id) || "Điểm giao nhận",
+      to: nameById.get(segment.to_id) || "Điểm giao nhận",
+      distanceM: segment.distance_m || 0,
+      timeMin: segment.travel_time_min || 0,
+      cost: segment.total_cost || 0,
+    }));
+  }, [graph, mode, multiResult]);
 
   return (
     <AppShell online={healthQuery.isSuccess} scenarioName={scenarioName}>
@@ -329,11 +397,11 @@ export default function App() {
             />
 
             <div className="map-column">
-              {graphQuery.isError && (
+              {graphError && (
                 <div className="graph-error panel">
                   <AlertTriangle size={19} />
-                  <span><strong>Không tải được traffic graph.</strong>{errorMessage(graphQuery.error)}</span>
-                  <button type="button" onClick={() => graphQuery.refetch()}><RefreshCw size={14} /> Thử lại</button>
+                  <span><strong>Không tải được mạng giao thông.</strong>{errorMessage(graphError)}</span>
+                  <button type="button" onClick={() => { graphQuery.refetch(); if (scenario !== "normal") trafficQuery.refetch(); }}><RefreshCw size={14} /> Thử lại</button>
                 </div>
               )}
               <MapStage
@@ -345,7 +413,8 @@ export default function App() {
                 stops={mode === "multi" ? stops : []}
                 selectionLabel={selectionTarget === "start" ? "Đang chọn điểm đi" : selectionTarget === "goal" ? "Đang chọn điểm đến" : "Đang thêm điểm ghé"}
                 onSelectNode={handleMapSelect}
-                loading={graphQuery.isFetching}
+                loading={graphLoading}
+                trafficOverlay={trafficQuery.data?.scenario === scenario ? trafficQuery.data : undefined}
               />
               <PlaybackBar
                 trace={trace}
@@ -360,7 +429,7 @@ export default function App() {
 
             {mode === "compare"
               ? <ComparePanel data={compareResult} metadata={metadata} />
-              : <InsightsPanel result={displayResult} selectedPathNames={selectedPathNames} />}
+              : <InsightsPanel result={displayResult} selectedPathNames={selectedPathNames} deliveryLegs={deliveryLegs} />}
           </motion.main>
         </AnimatePresence>
       )}

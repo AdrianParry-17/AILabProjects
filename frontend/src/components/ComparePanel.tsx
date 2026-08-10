@@ -18,7 +18,7 @@ export const ComparePanel = memo(function ComparePanel({ data, metadata }: { dat
   const rows = (data?.results || []).map((result) => ({
     id: result.algorithm,
     name: metadata.algorithms.find((item) => item.id === result.algorithm)?.name || result.algorithm,
-    cost: result.metrics.total_cost,
+    cost: result.found ? result.metrics.total_cost : null,
     distance: result.metrics.total_distance_m,
     time: result.metrics.total_time_min,
     explored: result.metrics.explored_nodes,
@@ -26,7 +26,9 @@ export const ComparePanel = memo(function ComparePanel({ data, metadata }: { dat
     frontier: result.metrics.frontier_peak || 0,
     found: result.found,
   }));
-  const winner = data?.winner || (rows.length ? [...rows].sort((a, b) => a.cost - b.cost)[0].id : undefined);
+  const successfulRows = rows.filter((row) => row.found && row.cost != null);
+  const backendWinner = data?.winner && successfulRows.some((row) => row.id === data.winner) ? data.winner : undefined;
+  const winner = backendWinner || (successfulRows.length ? [...successfulRows].sort((a, b) => Number(a.cost) - Number(b.cost))[0].id : undefined);
   const colors = ["#38bdf8", "#34d399", "#fbbf24", "#c084fc", "#fb7185", "#22d3ee", "#a3e635", "#f97316"];
 
   return (
@@ -51,6 +53,13 @@ export const ComparePanel = memo(function ComparePanel({ data, metadata }: { dat
             <div className="winner-card">
               <Award size={24} />
               <div><small>Hiệu quả nhất theo total cost</small><strong>{rows.find((row) => row.id === winner)?.name || winner}</strong></div>
+            </div>
+          )}
+          {!winner && (
+            <div className="compare-empty compact">
+              <BrainCircuit size={26} />
+              <h3>Chưa thuật toán nào tìm thấy tuyến</h3>
+              <p>Hãy đổi điểm giao nhận, kịch bản giao thông hoặc giới hạn tìm kiếm rồi chạy lại benchmark.</p>
             </div>
           )}
 
@@ -78,11 +87,11 @@ export const ComparePanel = memo(function ComparePanel({ data, metadata }: { dat
               </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={row.id} className={row.id === winner ? "winner" : ""}>
+                  <tr key={row.id} className={row.id === winner ? "winner" : row.found ? "" : "failed"}>
                     <td><i style={{ background: colors[rows.indexOf(row) % colors.length] }} /> <strong>{row.name}</strong>{row.id === winner && <Award size={13} />}</td>
-                    <td>{formatDistance(row.distance)}</td>
-                    <td>{formatTime(row.time)}</td>
-                    <td>{compactNumber(row.cost)}</td>
+                    <td>{row.found ? formatDistance(row.distance) : "Không có tuyến"}</td>
+                    <td>{row.found ? formatTime(row.time) : "—"}</td>
+                    <td>{row.found ? compactNumber(row.cost ?? undefined) : "—"}</td>
                     <td>{row.explored}</td>
                     <td>{formatRuntime(row.runtime)}</td>
                   </tr>
