@@ -1,25 +1,50 @@
-# --- Python ---
+# Python
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.coverage
+pytest-cache-files-*/
+.mypy_cache/
+.ruff_cache/
 .venv/
 venv/
-.pytest_cache/
-.ruff_cache/
-*.egg-info/
-.pytest_cache
 
-# --- Node / Vite (frontend) ---
+# Node
 node_modules/
 dist/
-*.local
-frontend/dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+.runtime/
+.tmp/
+.pytest-run-*/
 
-# --- Editor / OS ---
-.vscode/
+# Environment / editors
+.env
+.env.local
+!.env.example
 .idea/
+.vscode/
+*.swp
+
+# Runtime caches
+backend/data/cache/*
+!backend/data/cache/.gitkeep
+
+# Teammate/raw import workspace (canonical snapshots live in backend/data)
+backend/data-tmp/
+
+# Report build scaffolding (generated; only deliverables are committed)
+report/build/
+
+# OS
 .DS_Store
 Thumbs.db
 
-# --- Local tool state ---
+# Local tool state
 .opencode/
 opencode.json
