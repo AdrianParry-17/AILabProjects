@@ -1,10 +1,12 @@
 import type {
   AlgorithmMeta,
+  CompareResponse,
   CostBreakdown,
   CostWeights,
   GraphPayload,
   HeuristicMeta,
   MetadataPayload,
+  MultiRouteResponse,
   RouteGeoJson,
   RouteMetrics,
   SearchRequest,
@@ -97,6 +99,14 @@ function normalizeMetadata(raw: any): MetadataPayload {
       { id: "priority_delivery", name: "Giao ưu tiên", description: "Ưu tiên ETA và độ trễ cho đơn cần giao sớm." },
       { id: "custom", name: "Custom weights", description: "Điều chỉnh trực tiếp bằng sliders." },
     ],
+    multi_algorithms: (raw.multi_route_methods || []).map((item: any) => ({
+      id: item.id,
+      name: item.label,
+      description: item.description,
+      complete: true,
+      optimal: item.exact,
+      caveat: item.exact ? "Tối ưu chính xác trong giới hạn số điểm dừng hỗ trợ." : "Xấp xỉ có seed cố định để kết quả lặp lại được.",
+    })),
     defaults: {
       algorithm: raw.defaults?.algorithm,
       heuristic: raw.defaults?.heuristic,
@@ -230,6 +240,13 @@ const ALGORITHM_LABELS: Record<string, string> = {
   greedy_best_first: "Greedy Best-First",
   bidirectional_dijkstra: "Bidirectional Dijkstra",
   ida_star: "IDA*",
+};
+
+const MULTI_METHOD_LABELS: Record<string, string> = {
+  nearest_neighbor: "Nearest Neighbor",
+  two_opt: "Nearest Neighbor + 2-opt",
+  held_karp: "Held–Karp",
+  simulated_annealing: "Simulated Annealing",
 };
 
 const SCENARIO_LABELS: Record<string, string> = {
@@ -525,6 +542,63 @@ function normalizeSearch(raw: any): SearchResponse {
   };
 }
 
+function normalizeCompare(raw: any): CompareResponse {
+  const results = (raw.runs || []).map(normalizeSearch);
+  const agreement = raw.agreement;
+  return {
+    results,
+    winner: raw.best_algorithm,
+    insight: agreement
+      ? `${agreement.unique_path_count} tuyến khác nhau được tạo ra. ${agreement.same_path ? "Tất cả thuật toán đồng thuận cùng một tuyến." : "Expansion strategy đã dẫn tới các tuyến khác nhau."}`
+      : undefined,
+  };
+}
+
+function normalizeMulti(raw: any): MultiRouteResponse {
+  const method = raw.method?.id || raw.method;
+  const metrics = normalizeMetrics(raw.metrics);
+  const found = raw.status === "found";
+  const methodName = MULTI_METHOD_LABELS[method] || String(method || "Bộ tối ưu nhiều điểm").replaceAll("_", " ");
+  const optimality = method === "held_karp"
+    ? "Bảo đảm thứ tự ghé tối ưu cho số điểm dừng nằm trong giới hạn của Held–Karp."
+    : "Phương pháp heuristic ưu tiên thời gian chạy; không bảo đảm thứ tự ghé tối ưu toàn cục.";
+  const warnings = raw.explanation?.warnings?.length
+    ? ["Traffic, sự cố và mức rủi ro trong bản lab là dữ liệu mô phỏng theo kịch bản, không phải dữ liệu điều hành thời gian thực."]
+    : [];
+  return {
+    found,
+    method,
+    order: raw.stop_order || [],
+    segments: (raw.segments || []).map((segment: any) => ({
+      from_id: String(segment.from_id),
+      to_id: String(segment.to_id),
+      path: segment.path || [],
+      edge_ids: segment.edge_ids || [],
+      route_geojson: geoFeature(segment.route_geojson),
+      cost_breakdown: normalizeBreakdown(segment.cost_breakdown),
+      distance_m: Number(segment.cost_breakdown?.distance_m || 0),
+      travel_time_min: Number(segment.cost_breakdown?.travel_time_s || 0) / 60,
+      total_cost: Number(segment.cost_breakdown?.total_cost || 0),
+    })),
+    route_geojson: geoFeature(raw.route_geojson),
+    metrics,
+    cost_breakdown: normalizeBreakdown(raw.cost_breakdown),
+    explanation: {
+      summary: found
+        ? `${methodName} đã sắp xếp ${raw.stop_order?.length || 0} điểm ghé thành hành trình dài ${(metrics.total_distance_m / 1000).toFixed(2)} km.`
+        : `${methodName} chưa tạo được hành trình khả dụng qua toàn bộ điểm ghé.`,
+      reasons: [
+        "Bộ tối ưu quyết định thứ tự ghé; mỗi chặng giữa hai điểm được dựng bằng Dijkstra trên cùng hàm chi phí.",
+        `Đã đánh giá ${metrics.generated_nodes || 0} lượt tìm kiếm cặp điểm và mở rộng tổng cộng ${metrics.explored_nodes || 0} nút.`,
+      ],
+      warnings,
+      optimality,
+    },
+    optimality,
+    original_order: raw.requested_stop_ids || [],
+  };
+}
+
 export const trafficApi = {
   health: () => request<any>("/health"),
   metadata: async () => normalizeMetadata(await request<any>("/metadata")),
@@ -557,6 +631,44 @@ export const trafficApi = {
       max_trace_events: 1_200,
       max_expansions: 100_000,
       include_alternative: true,
+    }),
+  })),
+  compare: async (body: SearchRequest & { algorithms: string[] }) => normalizeCompare(await request<any>("/compare", {
+    method: "POST",
+    body: JSON.stringify({
+      start_id: body.start,
+      goal_id: body.goal,
+      algorithms: body.algorithms,
+      heuristic: body.heuristic === "auto" ? "travel_time" : body.heuristic,
+      scenario: body.scenario,
+      cost_weights: toApiWeights(body.weights),
+      include_trace: false,
+      max_trace_events: 0,
+      max_expansions: 100_000,
+    }),
+  })),
+  multiRoute: async (body: {
+    start: string;
+    stops: string[];
+    return_to_start: boolean;
+    method: string;
+    segment_algorithm: string;
+    heuristic: string;
+    objective: string;
+    scenario: string;
+    weights: SearchRequest["weights"];
+  }) => normalizeMulti(await request<any>("/multi-route", {
+    method: "POST",
+    body: JSON.stringify({
+      start_id: body.start,
+      stop_ids: body.stops,
+      return_to_start: body.return_to_start,
+      method: body.method,
+      scenario: body.scenario,
+      cost_weights: toApiWeights(body.weights),
+      seed: 42,
+      max_iterations: 2_000,
+      max_expansions: 100_000,
     }),
   })),
 };

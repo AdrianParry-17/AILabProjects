@@ -10,16 +10,17 @@ import {
   useMapEvents,
 } from "react-leaflet";
 import { Activity, Crosshair, Layers3, MousePointerClick, Navigation, Route } from "lucide-react";
-import type { GraphEdge, GraphPayload, SearchResponse, TraceLink, TraceStep } from "../types";
+import type { GraphEdge, GraphPayload, MultiRouteResponse, SearchResponse, TraceLink, TraceStep } from "../types";
 import { congestionColor, formatNodeKind } from "../lib/format";
 import type { TrafficOverlay } from "../api";
 
 interface Props {
   graph?: GraphPayload;
-  result?: SearchResponse;
+  result?: SearchResponse | MultiRouteResponse;
   traceStep?: TraceStep;
   start?: string;
   goal?: string;
+  stops?: string[];
   selectionLabel: string;
   onSelectNode: (id: string) => void;
   loading?: boolean;
@@ -87,7 +88,7 @@ const NearestNodePicker = memo(function NearestNodePicker({ graph, onSelect }: {
   return null;
 });
 
-function routeCoordinates(result?: SearchResponse): [number, number][] {
+function routeCoordinates(result?: SearchResponse | MultiRouteResponse): [number, number][] {
   const coordinates = result?.route_geojson?.geometry?.coordinates || [];
   return coordinates.map(([lon, lat]) => [lat, lon]);
 }
@@ -587,12 +588,12 @@ export function MapStage({
   traceStep,
   start,
   goal,
+  stops = [],
   selectionLabel,
   onSelectNode,
   loading,
   trafficOverlay,
 }: Props) {
-  const stops: string[] = [];
   const topologyKey = graph ? `${graph.name}|${graph.generated_at || "snapshot"}|${graph.nodes.length}|${graph.edges.length}` : "empty";
   const [roadsReadyFor, setRoadsReadyFor] = useState("");
   const [nodesReadyFor, setNodesReadyFor] = useState("");
@@ -613,8 +614,8 @@ export function MapStage({
   const frontier = new Set(traceStep?.frontier || []);
   const revealResult = !traceStep || Boolean(traceStep.is_complete);
   const route = revealResult ? routeCoordinates(result) : [];
-  const alternative = revealResult && result?.alternative
-    ? routeCoordinates(result.alternative as unknown as SearchResponse)
+  const alternative = revealResult && "alternative" in (result || {})
+    ? routeCoordinates((result as SearchResponse).alternative as unknown as SearchResponse)
     : [];
 
   const linkCoordinates = (link: TraceLink): [number, number][] => {

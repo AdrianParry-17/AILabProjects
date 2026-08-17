@@ -3,8 +3,11 @@ import {
   AlertTriangle,
   ArrowDownUp,
   BrainCircuit,
+  Check,
+  ChevronRight,
   CircleDot,
   Gauge,
+  ListPlus,
   LocateFixed,
   Play,
   RotateCcw,
@@ -12,41 +15,52 @@ import {
   Shield,
   Sparkles,
   Target,
+  X,
 } from "lucide-react";
 import type {
   AlgorithmMeta,
   CostWeights,
   GraphPayload,
   MetadataPayload,
+  PlannerMode,
 } from "../types";
 import { formatNodeKind } from "../lib/format";
 
-type SelectionTarget = "start" | "goal";
+type SelectionTarget = "start" | "goal" | "stop";
 const LOCATION_OPTION_BATCH = 32;
 const PICKUP_ICON = <LocateFixed size={18} />;
 const DROPOFF_ICON = <Target size={18} />;
 
 interface Props {
+  mode: PlannerMode;
   graph?: GraphPayload;
   metadata: MetadataPayload;
   start: string;
   goal: string;
+  stops: string[];
   algorithm: string;
   heuristic: string;
   objective: string;
   scenario: string;
   weights: CostWeights;
   selectionTarget: SelectionTarget;
+  comparisonAlgorithms: string[];
+  multiMethod: string;
+  returnToStart: boolean;
   loading: boolean;
   error?: string;
   onStart: (value: string) => void;
   onGoal: (value: string) => void;
+  onStops: (value: string[]) => void;
   onAlgorithm: (value: string) => void;
   onHeuristic: (value: string) => void;
   onObjective: (value: string) => void;
   onScenario: (value: string) => void;
   onWeights: (value: CostWeights) => void;
   onSelectionTarget: (value: SelectionTarget) => void;
+  onComparisonAlgorithms: (value: string[]) => void;
+  onMultiMethod: (value: string) => void;
+  onReturnToStart: (value: boolean) => void;
   onRun: () => void;
 }
 
@@ -88,6 +102,7 @@ const LocationSelect = memo(function LocationSelect({
           ))}
         </select>
       </span>
+      <ChevronRight size={16} />
     </label>
   );
 });
@@ -130,12 +145,12 @@ function GuaranteeBadge({ algorithm }: { algorithm?: AlgorithmMeta }) {
 
 export const ControlDeck = memo(function ControlDeck(props: Props) {
   const {
-    graph, metadata, start, goal, algorithm, heuristic, objective, scenario, weights,
-    selectionTarget, loading, error,
+    mode, graph, metadata, start, goal, stops, algorithm, heuristic, objective, scenario, weights,
+    selectionTarget, comparisonAlgorithms, multiMethod, returnToStart, loading, error,
   } = props;
   const selectedAlgorithm = metadata.algorithms.find((item) => item.id === algorithm);
   const supportsHeuristic = selectedAlgorithm?.supports_heuristic ?? ["astar", "greedy_best_first", "ida_star"].includes(algorithm);
-  const canRun = Boolean(start && goal);
+  const canRun = Boolean(start && (mode === "multi" ? stops.length >= 2 : goal));
   const deliveryPoints = useMemo(() => graph?.nodes
     .filter((node) => node.is_delivery_point && node.routing_component === "primary")
     .sort((first, second) => first.name.localeCompare(second.name, "vi")) || [], [graph]);
@@ -165,15 +180,26 @@ export const ControlDeck = memo(function ControlDeck(props: Props) {
   );
   const activateStart = useCallback(() => props.onSelectionTarget("start"), [props.onSelectionTarget]);
   const activateGoal = useCallback(() => props.onSelectionTarget("goal"), [props.onSelectionTarget]);
+  const stopLimit = multiMethod === "held_karp" ? 10 : 12;
+  const availableStops = useMemo(
+    () => deliveryPoints.filter((node) => node.id !== start && !stops.includes(node.id)),
+    [deliveryPoints, start, stops],
+  );
 
   const setWeight = (key: keyof CostWeights, value: number) => props.onWeights({ ...weights, [key]: value });
+  const toggleCompare = (id: string) => {
+    const next = comparisonAlgorithms.includes(id)
+      ? comparisonAlgorithms.filter((item) => item !== id)
+      : [...comparisonAlgorithms, id];
+    if (next.length >= 2 && next.length <= 8) props.onComparisonAlgorithms(next);
+  };
 
   return (
     <aside className="control-deck panel">
       <div className="panel-heading">
         <div>
           <span className="section-kicker">DELIVERY CONFIGURATION</span>
-          <h2>Lập tuyến giao nhận</h2>
+          <h2>{mode === "multi" ? "Tối ưu vòng giao hàng" : mode === "compare" ? "Benchmark thuật toán" : "Lập tuyến giao nhận"}</h2>
         </div>
         <button className="icon-button" type="button" title="Đặt lại trọng số" onClick={() => props.onWeights({ distance: 1, time: 1.35, congestion: 2.2, risk: 3.4 })}>
           <RotateCcw size={16} />
@@ -192,35 +218,114 @@ export const ControlDeck = memo(function ControlDeck(props: Props) {
           onChange={props.onStart}
         />
 
-        <button
-          type="button"
-          className="swap-button"
-          title="Đảo chiều tuyến"
-          onClick={() => { props.onStart(goal); props.onGoal(start); }}
-        >
-          <ArrowDownUp size={14} />
-        </button>
-        <LocationSelect
-          label="Điểm giao hàng / đích"
-           icon={DROPOFF_ICON}
-          value={goal}
-          graph={graph}
-           deliveryPoints={visibleDeliveryPoints}
-          active={selectionTarget === "goal"}
-           onActivate={activateGoal}
-          onChange={props.onGoal}
-        />
+        {mode !== "multi" && (
+          <>
+            <button
+              type="button"
+              className="swap-button"
+              title="Đảo chiều tuyến"
+              onClick={() => { props.onStart(goal); props.onGoal(start); }}
+            >
+              <ArrowDownUp size={14} />
+            </button>
+            <LocationSelect
+              label="Điểm giao hàng / đích"
+               icon={DROPOFF_ICON}
+              value={goal}
+              graph={graph}
+               deliveryPoints={visibleDeliveryPoints}
+              active={selectionTarget === "goal"}
+               onActivate={activateGoal}
+              onChange={props.onGoal}
+            />
+          </>
+        )}
       </div>
+
+      {mode === "multi" && (
+        <div className="multi-stops-block">
+          <div className="subheading-row">
+            <span><ListPlus size={15} /> Điểm cần ghé ({stops.length})</span>
+            <button type="button" className={selectionTarget === "stop" ? "is-active" : ""} onClick={() => props.onSelectionTarget("stop")}>
+              + chọn trên map
+            </button>
+          </div>
+          <label className="compact-field stop-picker">
+            <span>Thêm điểm giao từ danh sách</span>
+            <select
+              aria-label="Thêm điểm giao"
+              value=""
+              disabled={stops.length >= stopLimit || !availableStops.length}
+              onChange={(event) => {
+                const id = event.target.value;
+                if (id && stops.length < stopLimit) props.onStops([...stops, id]);
+              }}
+            >
+              <option value="">Chọn địa điểm giao nhận…</option>
+              {availableStops.map((node) => <option key={node.id} value={node.id}>{node.name} · {formatNodeKind(node.kind)}</option>)}
+            </select>
+          </label>
+          <div className="stop-chips">
+            {!stops.length && <span className="empty-note">Thêm 2–12 điểm giao; Held–Karp hỗ trợ tối đa 10.</span>}
+            {stops.map((id, index) => {
+              const node = graph?.nodes.find((item) => item.id === id);
+              return (
+                <span key={id} className="stop-chip">
+                  <b>{index + 1}</b>{node?.short_name || node?.name || id}
+                  <button type="button" onClick={() => props.onStops(stops.filter((item) => item !== id))}><X size={12} /></button>
+                </span>
+              );
+            })}
+          </div>
+          <div className="two-column-fields">
+            <label className="compact-field">
+              <span>Optimizer</span>
+              <select value={multiMethod} onChange={(event) => props.onMultiMethod(event.target.value)}>
+                {(metadata.multi_algorithms || []).map((item) => <option key={item.id} value={item.id} disabled={item.id === "held_karp" && stops.length > 10}>{item.name}</option>)}
+                {!(metadata.multi_algorithms || []).length && <>
+                  <option value="nearest_neighbor">Nearest Neighbor</option>
+                  <option value="two_opt">Nearest Neighbor + 2-opt</option>
+                  <option value="held_karp">Held–Karp exact</option>
+                  <option value="simulated_annealing">Simulated Annealing</option>
+                </>}
+              </select>
+            </label>
+            <label className="toggle-field">
+              <input type="checkbox" checked={returnToStart} onChange={(event) => props.onReturnToStart(event.target.checked)} />
+              <span className="toggle-track"><i /></span>
+              Quay về điểm đầu
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className="divider" />
 
       <div className="control-grid">
-        <label className="compact-field span-2">
-          <span><BrainCircuit size={14} /> Thuật toán</span>
-          <select value={algorithm} onChange={(event) => props.onAlgorithm(event.target.value)}>
-            {metadata.algorithms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
+        {mode !== "compare" && mode !== "multi" && (
+          <label className="compact-field span-2">
+            <span><BrainCircuit size={14} /> Thuật toán</span>
+            <select value={algorithm} onChange={(event) => props.onAlgorithm(event.target.value)}>
+              {metadata.algorithms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+        )}
+
+        {mode === "compare" && (
+          <div className="algorithm-picker span-2">
+            <span className="field-label"><BrainCircuit size={14} /> Chọn 2–8 thuật toán</span>
+            <div className="algorithm-check-grid">
+              {metadata.algorithms.map((item) => {
+                const selected = comparisonAlgorithms.includes(item.id);
+                return (
+                  <button key={item.id} type="button" className={selected ? "selected" : ""} onClick={() => toggleCompare(item.id)}>
+                    <span className="check-box">{selected && <Check size={12} />}</span>{item.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <label className="compact-field">
           <span><Gauge size={14} /> Mục tiêu</span>
@@ -229,12 +334,14 @@ export const ControlDeck = memo(function ControlDeck(props: Props) {
           </select>
         </label>
 
-        <label className="compact-field">
-          <span><Sparkles size={14} /> Heuristic</span>
-          <select value={heuristic} disabled={!supportsHeuristic} onChange={(event) => props.onHeuristic(event.target.value)}>
-            {metadata.heuristics.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
-        </label>
+        {mode !== "multi" && (
+          <label className="compact-field">
+            <span><Sparkles size={14} /> Heuristic</span>
+            <select value={heuristic} disabled={!supportsHeuristic && mode !== "compare"} onChange={(event) => props.onHeuristic(event.target.value)}>
+              {metadata.heuristics.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+        )}
 
         <label className="compact-field span-2">
           <span><CircleDot size={14} /> Điều kiện giao thông</span>
@@ -243,6 +350,13 @@ export const ControlDeck = memo(function ControlDeck(props: Props) {
           </select>
         </label>
       </div>
+
+      {mode === "multi" && (
+        <div className="guarantee-note guaranteed">
+          <Shield size={15} />
+          <span><strong>Chặng giao dùng Dijkstra</strong>Optimizer chỉ sắp thứ tự điểm ghé; mỗi chặng dùng đường đi chi phí thấp nhất.</span>
+        </div>
+      )}
 
       <details className="weight-panel" open>
         <summary><Settings2 size={15} /> Hàm chi phí <span>Σ wᵢ × featureᵢ</span></summary>
@@ -254,12 +368,12 @@ export const ControlDeck = memo(function ControlDeck(props: Props) {
         </div>
       </details>
 
-      <GuaranteeBadge algorithm={selectedAlgorithm} />
+      {mode !== "compare" && mode !== "multi" && <GuaranteeBadge algorithm={selectedAlgorithm} />}
       {error && <div className="error-banner"><AlertTriangle size={16} /><span>{error}</span></div>}
 
-      <button type="button" className="run-button" onClick={props.onRun} disabled={!canRun || loading}>
+      <button type="button" className="run-button" onClick={props.onRun} disabled={!canRun || loading || (mode === "compare" && comparisonAlgorithms.length < 2)}>
         {loading ? <span className="spinner" /> : <Play size={18} fill="currentColor" />}
-        <span>{loading ? "Đang chạy search engine…" : "Tìm tuyến & tạo lời giải thích"}</span>
+        <span>{loading ? "Đang chạy search engine…" : mode === "compare" ? `Chạy benchmark ${comparisonAlgorithms.length} thuật toán` : mode === "multi" ? "Tối ưu hành trình" : "Tìm tuyến & tạo lời giải thích"}</span>
       </button>
     </aside>
   );

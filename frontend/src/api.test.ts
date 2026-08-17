@@ -25,6 +25,7 @@ describe("FastAPI contract adapter", () => {
     const metadata = await trafficApi.metadata();
     expect(metadata.algorithms[0]).toMatchObject({ id: "astar", name: "A* Search", supports_heuristic: true });
     expect(metadata.heuristics[0]).toMatchObject({ admissible: true, consistent: true });
+    expect(metadata.multi_algorithms?.[0]).toMatchObject({ id: "held_karp", optimal: true });
     expect(metadata.defaults?.weights).toEqual({ distance: .25, time: .5, congestion: .2, risk: .05 });
   });
 
@@ -101,6 +102,35 @@ describe("FastAPI contract adapter", () => {
     expect(result.metrics.total_time_min).toBe(3);
     expect(result.alternative?.metrics).toMatchObject({ total_distance_m: 1300, total_time_min: 3.5, total_cost: 1.5 });
     expect(`${result.alternative?.label} ${result.alternative?.explanation}`).not.toMatch(/osm_path_|excluding primary edge/i);
+  });
+
+  it("keeps multi-stop leg routes and per-leg costs", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      status: "found",
+      method: { id: "two_opt" },
+      scenario: { id: "normal" },
+      requested_stop_ids: ["market"],
+      stop_order: ["market"],
+      route_geojson: { type: "LineString", coordinates: [[106.69, 10.77], [106.70, 10.78]] },
+      metrics: { runtime_ms: 2, pairwise_expanded_nodes: 8, pairwise_searches: 2, hop_count: 1, path_cost: 1.2, distance_m: 900, travel_time_s: 180 },
+      segments: [{
+        from_id: "hub", to_id: "market", path: ["hub", "market"], edge_ids: ["hm"],
+        route_geojson: { type: "LineString", coordinates: [[106.69, 10.77], [106.70, 10.78]] },
+        cost_breakdown: { distance_m: 900, travel_time_s: 180, components: { distance: .3, travel_time: .9 }, total_cost: 1.2 },
+      }],
+      explanation: { warnings: [] },
+    })));
+
+    const result = await trafficApi.multiRoute({
+      start: "hub", stops: ["market"], return_to_start: false, method: "two_opt",
+      segment_algorithm: "dijkstra", heuristic: "zero", objective: "balanced", scenario: "normal",
+      weights: { distance: 1, time: 1, congestion: 1, risk: 1 },
+    });
+
+    expect(result.segments).toHaveLength(1);
+    expect(result.segments[0]).toMatchObject({ from_id: "hub", to_id: "market", distance_m: 900, travel_time_min: 3, total_cost: 1.2 });
+    expect(result.explanation).toMatchObject({ optimality: expect.stringContaining("heuristic") });
+    expect(typeof result.explanation === "object" ? result.explanation.reasons?.join(" ") : "").toContain("Dijkstra");
   });
 
   it("labels a truncated trace as a summary jump and preserves bidirectional optimality", async () => {

@@ -1,3 +1,4 @@
+export type PlannerMode = "route" | "multi" | "compare" | "learn";
 export type TrafficScenario = "normal" | "rush_hour" | "rain" | "flood" | "night" | string;
 export type Objective = "balanced" | "distance" | "time" | "safety" | "priority_delivery" | string;
 
@@ -94,6 +95,7 @@ export interface MetadataPayload {
   heuristics: HeuristicMeta[];
   objectives: OptionMeta[];
   scenarios: OptionMeta[];
+  multi_algorithms?: AlgorithmMeta[];
   defaults?: {
     algorithm?: string;
     heuristic?: string;
@@ -208,4 +210,37 @@ export interface SearchRequest {
   weights: CostWeights;
   avoid_flags?: string[];
   trace?: boolean;
+}
+
+export interface CompareResponse {
+  results: SearchResponse[];
+  winner?: string;
+  insight?: string;
+}
+
+export interface MultiRouteResponse {
+  found: boolean;
+  method: string;
+  order: string[];
+  order_names?: string[];
+  segments: MultiRouteSegment[];
+  route_geojson?: RouteGeoJson;
+  metrics: RouteMetrics;
+  cost_breakdown?: CostBreakdown;
+  explanation: string | { summary?: string; reasons?: string[]; warnings?: string[]; optimality?: string };
+  optimality?: string;
+  original_order?: string[];
+  improvement_percent?: number;
+}
+
+export interface MultiRouteSegment {
+  from_id: string;
+  to_id: string;
+  path: string[];
+  edge_ids: string[];
+  route_geojson?: RouteGeoJson;
+  cost_breakdown?: CostBreakdown;
+  distance_m?: number;
+  travel_time_min?: number;
+  total_cost?: number;
 }

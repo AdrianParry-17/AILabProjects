@@ -7,17 +7,26 @@ import {
   Cpu,
   Gauge,
   Milestone,
+  PackageCheck,
   Route,
   ShieldCheck,
   Sparkles,
   TrafficCone,
 } from "lucide-react";
-import type { SearchResponse } from "../types";
+import type { MultiRouteResponse, SearchResponse } from "../types";
 import { compactNumber, explanationParts, formatCostComponent, formatDistance, formatRuntime, formatTime } from "../lib/format";
 
 interface Props {
-  result?: SearchResponse;
+  result?: SearchResponse | MultiRouteResponse;
   selectedPathNames?: string[];
+  deliveryLegs?: Array<{
+    index: number;
+    from: string;
+    to: string;
+    distanceM: number;
+    timeMin: number;
+    cost: number;
+  }>;
 }
 
 function MetricCard({ icon, label, value, tone }: { icon: React.ReactNode; label: string; value: string; tone: string }) {
@@ -29,10 +38,10 @@ function MetricCard({ icon, label, value, tone }: { icon: React.ReactNode; label
   );
 }
 
-export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathNames }: Props) {
+export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathNames, deliveryLegs = [] }: Props) {
   const metrics = result?.metrics;
   const explanation = explanationParts(result?.explanation as SearchResponse["explanation"]);
-  const pathNames = selectedPathNames || (result && "path_names" in result ? result.path_names : undefined) || [];
+  const pathNames = selectedPathNames || (result && "path_names" in result ? result.path_names : undefined) || (result && "order_names" in result ? result.order_names : undefined) || [];
   const breakdown = result && "cost_breakdown" in result ? result.cost_breakdown : undefined;
   const alternative = result && "alternative" in result ? result.alternative : undefined;
   const found = result?.found;
@@ -70,6 +79,21 @@ export const InsightsPanel = memo(function InsightsPanel({ result, selectedPathN
           </div>
         ) : <div className="empty-route">{result && !found ? "Search đã hoàn tất nhưng không có tuyến đi được với cấu hình hiện tại." : "Tuyến sẽ được vẽ và liệt kê sau khi chạy."}</div>}
       </div>
+
+      {deliveryLegs.length > 0 && (
+        <div className="delivery-legs-card">
+          <div className="subheading-row"><span><PackageCheck size={15} /> Chi tiết từng chặng giao</span><small>{deliveryLegs.length} chặng</small></div>
+          <div className="delivery-leg-list">
+            {deliveryLegs.map((leg) => (
+              <div className="delivery-leg" key={`${leg.index}-${leg.from}-${leg.to}`}>
+                <i>{leg.index}</i>
+                <span><strong>{leg.from}</strong><small>đến {leg.to}</small></span>
+                <b>{formatDistance(leg.distanceM)} · {formatTime(leg.timeMin)} · cost {compactNumber(leg.cost)}</b>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="explanation-card">
         <div className="explanation-title"><Sparkles size={16} /> Vì sao chọn tuyến này?</div>
