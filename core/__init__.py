@@ -5,7 +5,7 @@ The generic search framework that `algorithms/` builds on. It owns the uniform
 `run_algorithm`), event/history/metrics helpers, and depends only on `shared/`.
 
 It never imports `data`, `delivery`, `algorithms`, `visualization`, or `ui`
-(ARCHITECTURE.md § 3 dependency flow).
+(dependency flow in CONVENTION.md § 2).
 """
 
 from core.search_algorithm import (

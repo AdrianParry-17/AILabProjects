@@ -255,7 +255,5 @@ stopovers.
 ## 8. Relationship to other docs
 
 * `docs/DATASET_SPEC.md` — the input road graph + overlay rules.
-* `docs/ARCHITECTURE.md § 3-5` — RAW/PROCESSED/EXPORTED layering; this is the EXPORTED
-  layer.
-* `docs/MAP_CONTRACT.md` — how the expanded geometry is served to the UI.
+* `backend/app/` — serves the graph and expanded geometry to the UI.
 * `ALGORITHM_SPEC.md` — algorithms operate on this graph and call `expand_poi_path`.

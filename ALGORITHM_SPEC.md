@@ -10,7 +10,7 @@ This document defines the *shared* contract that every search algorithm follows:
 common interface, the single output model, the shared helpers, and the per-algorithm
 requirements. BFS-specific details live in `docs/BFS_SPEC.md`; this file is the
 authoritative shared framework and intentionally has no BFS-only content. Project
-structure and dependency flow are in `docs/ARCHITECTURE.md`.
+structure and dependency flow follow `CONVENTION.md § 2`.
 
 ---
 
@@ -243,8 +243,8 @@ FIFO `deque`, expands by hop-distance, fewest-edge path, hop-optimal only.
 # 8. Serialization
 
 Every `SearchResult` serializes via Pydantic (`model_dump()`). Field names are exactly
-those in `core/search_result.py` and MUST NOT be renamed by the backend or frontend
-(`docs/ARCHITECTURE.md § 4`). Unknown fields in a payload are ignored by consumers.
+those in `core/search_result.py` and MUST NOT be renamed by the backend or frontend.
+Unknown fields in a payload are ignored by consumers.
 
 ---
 
@@ -264,6 +264,4 @@ Per `CONVENTION.md § 9`, plus:
 # 10. Relationship to other docs
 
 * `docs/BFS_SPEC.md` — the BFS-specific contract (this doc's only child).
-* `docs/ARCHITECTURE.md` — structure, dependency flow, JSON contract.
-* `docs/MAP_CONTRACT.md` — how `SearchResult` is consumed by the React UI.
-* `CONVENTION.md` — typing, exceptions, tests, static analysis.
+* `CONVENTION.md` — project layout, typing, exceptions, tests, static analysis.

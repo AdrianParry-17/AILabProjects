@@ -7,10 +7,9 @@ Version: 3.0
 Status: **Enforced** (for code style, typing, error handling, tests, and tooling).
 
 This document is the single coding standard for the Python packages (`shared`, `config`,
-`core`, `data`, `delivery`, `algorithms`, `visualization`, `scripts`, `tests`) and applies
-to every contributor. Project structure, dependency flow, and the data layers are defined
-in `docs/ARCHITECTURE.md`; this file only covers **how code is written** and refers to the
-architecture for everything structural.
+`core`, `data`, `delivery`, `algorithms`, `visualization`, `scripts`, `tests`, `backend`)
+and applies to every contributor. This file covers **how code is written**; the backend
+API surface and the React frontend live in `backend/` and `frontend/` respectively.
 
 ---
 
@@ -28,14 +27,14 @@ architecture for everything structural.
 
 # 2. Project Layout & Imports
 
-The structure and the import chart are authoritative in `docs/ARCHITECTURE.md § 2-3`.
 The summary:
 
 * `shared` owns generic protocols/helpers. `config` owns single-source values.
   `core` owns the search framework (`SearchResult`, registry). `data` owns the road models
   + dataset. `delivery` owns the POI graph + road shortest paths. `algorithms` owns
   search. `visualization` owns map serialization. `scripts` owns the pipeline.
-* Imports flow downward only (ARCHITECTURE.md § 3). `data` never imports
+  `backend` owns the FastAPI routing API. `frontend` owns the React app.
+* Imports flow downward only. `data` never imports
   `delivery`/`algorithms`; `config`/`core` never import domain packages.
 * Import order in every file: standard library, third-party, then local modules. Group
   with blank lines, exactly as:
@@ -238,13 +237,11 @@ See `ALGORITHM_SPEC.md § 9` for algorithm-specific test obligations.
 
 # 12. JSON Naming (summary)
 
-The full contract is in `docs/ARCHITECTURE.md § 4`:
-
 * snake_case field names, identical to the Pydantic fields.
 * No field renaming between Python, JSON, or the React client.
 * Coordinates: WGS84 decimal degrees; geometry arrays use `[lon, lat]` in the dataset and
   `[lat, lon]` in UI-facing payloads if the UI demands — keep the chosen convention
-  documented in `docs/MAP_CONTRACT.md`.
+  documented in the backend schemas (`backend/app/schemas.py`).
 
 ---
 
@@ -297,13 +294,13 @@ test: add delivery graph connectivity test
 # 15. Code Review Checklist
 
 - [ ] Follows the naming (§ 3), typing (§ 4), and doc (§ 5) rules.
-- [ ] Imports respect the architecture dependency flow (`ARCHITECTURE.md § 3`).
+- [ ] Imports respect the architecture dependency flow (§ 2).
 - [ ] Uses shared helpers instead of duplicating logic.
 - [ ] Raises project-specific exceptions; nothing swallowed.
 - [ ] Tests added for the new behaviour; existing tests still pass.
 - [ ] `ruff`, `mypy`, `pytest` all green on changed code.
 - [ ] No `print()` in library code, no `streamlit` import.
-- [ ] JSON field names unchanged unless `data/models.py` + `MAP_CONTRACT.md` updated in
+- [ ] JSON field names unchanged unless `data/models.py` + the backend schemas updated in
       the same PR.
 
 # UI Language Convention

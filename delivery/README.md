@@ -20,5 +20,5 @@ Reproduce:
 python scripts/build_delivery_graph.py
 ```
 
-See `docs/DELIVERY_GRAPH.md` for the full contract and `docs/ARCHITECTURE.md` for the
+See `docs/DELIVERY_GRAPH.md` for the full contract and `data/models.py` for the
 two-layer data model.

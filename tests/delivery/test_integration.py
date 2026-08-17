@@ -98,7 +98,7 @@ def test_workflow_search_result_serializes_to_map_contract() -> None:
 def test_workflow_expanded_route_serializes_to_map_contract() -> None:
     _, _, _, expanded = _workflow()
     contract_fields = ("node_ids", "geometry", "hops", "distance_km", "time_min")
-    # ExpandedRoute is a dataclass; mirror the MAP_CONTRACT §4 JSON shape field-for-field.
+    # ExpandedRoute is a dataclass; mirror the served JSON shape field-for-field.
     payload: dict[str, object] = {
         "node_ids": expanded.node_ids,
         "geometry": expanded.geometry,

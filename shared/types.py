@@ -17,7 +17,7 @@ LatLon = tuple[float, float]
 # A [longitude, latitude] point (matching the dataset geometry convention).
 LonLat = list[float]
 
-# A polyline of [lon, lat] points (MAP_CONTRACT.md geometry).
+# A polyline of [lon, lat] points (dataset geometry convention).
 Polyline = list[LonLat]
 
 

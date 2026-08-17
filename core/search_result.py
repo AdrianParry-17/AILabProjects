@@ -1,7 +1,7 @@
 """Shared output models returned by every search algorithm.
 
 Owned by the core framework so all algorithms (BFS, DFS, UCS, A*, ...) and the
-visualization/UI layers serialize the same JSON shape (MAP_CONTRACT.md § 2).
+visualization/backend layers serialize the same JSON shape.
 """
 
 from pydantic import BaseModel

@@ -3,8 +3,8 @@
 `load_graph` validates the schema version on every call (unless `validate=False`),
 mirroring `delivery.loader.load_delivery_graph`. `data/processed/graph.json` is the
 source of truth for the road layer; its `metadata.schema_version` must match the
-single source in `config.settings.SCHEMA_VERSION` (CONVENTION.md § 11,
-ARCHITECTURE.md § 4). The default path comes from `config.paths`.
+single source in `config.settings.SCHEMA_VERSION` (CONVENTION.md § 11).
+The default path comes from `config.paths`.
 """
 
 import json

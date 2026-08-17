@@ -20,7 +20,7 @@ order, and how to verify. It refers to the specs; it does not restate them.
 | T1 | Crawl OSM + build road graph | `data/raw/*`, `data/processed/graph.json`, `scripts/` | `docs/DATASET_SPEC.md` |
 | T2 | Build delivery graph | `delivery/`, `data/exports/delivery_graph.json` | `docs/DELIVERY_GRAPH.md` |
 | T3 | Implement BFS + shared helpers | `algorithms/bfs.py`, `metrics.py`, `heuristic.py`, tests | `docs/BFS_SPEC.md`, `ALGORITHM_SPEC.md` |
-| T4 | Lock the map contract | `GraphData` / `DeliveryGraph` / `SearchResult` / expanded route | `docs/MAP_CONTRACT.md` |
+| T4 | Lock the map contract | `GraphData` / `DeliveryGraph` / `SearchResult` / expanded route | `backend/app/schemas.py` |
 | T5 | Report contribution | dataset + BFS + comparison sections | assignment §4.9 |
 
 ---
@@ -106,11 +106,11 @@ Follow-up: scenario where fewest-hop ≠ cheapest (report/demo example).
 Goal: the UI renders the map and animates a search with zero data/algorithm churn.
 
 - [x] `DeliveryGraph` / `SearchResult` / `SearchStep` JSON shapes locked
-      (`docs/MAP_CONTRACT.md`).
+      (`backend/app/schemas.py`).
 - [x] `delivery/route.expand_poi_path` — POI path → road polyline.
-- [ ] Backend API shell (`/dataset`, `/road`, `/search`, `/route/expand`) if a service
-      layer is created (`ARCHITECTURE.md § 6`).
-- [ ] UI team confirms it can draw the graph + animate a search from the payloads.
+- [x] Backend API shell (`/api/v1/graph`, `/api/v1/search`, `/api/v1/route/expand`) in
+      `backend/app/`.
+- [x] UI team confirms it can draw the graph + animate a search from the payloads.
 
 ---
 

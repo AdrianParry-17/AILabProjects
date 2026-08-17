@@ -12,8 +12,8 @@ and the segmentation into RAW / PROCESSED / EXPORTED data layers).
 This document is the contract for the **road** dataset and the crawl pipeline. It is the
 source of truth for `data/models.py` and `data/processed/graph.json`. The POI-only
 application layer (`data/exports/delivery_graph.json`) is specified in
-`docs/DELIVERY_GRAPH.md`. Project-level data-layer definitions are in
-`docs/ARCHITECTURE.md § 3-5`.
+`docs/DELIVERY_GRAPH.md`. Project-level data-layer definitions follow
+`data/models.py` and `config/`.
 
 ---
 
@@ -33,7 +33,7 @@ application layer (`data/exports/delivery_graph.json`) is specified in
 * The application-layer POI graph (`data/exports/delivery_graph.json`) →
   `docs/DELIVERY_GRAPH.md`.
 * Algorithm implementation → `ALGORITHM_SPEC.md` + `docs/BFS_SPEC.md`.
-* Frontend payloads → `docs/MAP_CONTRACT.md`.
+* Frontend payloads → `backend/app/schemas.py`.
 
 The dataset stores **base** edge attributes only (`distance_km`, `time_min`,
 `congestion`, `risk`). Runtime traffic scenarios multiply these in the cost layer; they
@@ -42,8 +42,6 @@ are not stored per scenario.
 ---
 
 # 2. Data Layers (short)
-
-Referenced precisely in `docs/ARCHITECTURE.md § 3`:
 
 | Layer | Path | Schema | Role |
 |-------|------|--------|------|
@@ -268,5 +266,5 @@ totals slightly; treat the file's own `metadata.stats` as the live source.
 
 This file is the single dataset contract. It replaced older int-id / CSV-era documents.
 String ids (`osm_*` / `poi_*`), two-layer data (RAW/PROCESSED/EXPORTED), and OSM
-provenance are now authoritative in `docs/ARCHITECTURE.md`, `data/models.py`, and this
-file. Update `docs/DELIVERY_GRAPH.md` and `docs/MAP_CONTRACT.md` if this schema changes.
+provenance are now authoritative in `data/models.py`, `config/`, and this
+file. Update `docs/DELIVERY_GRAPH.md` and `backend/app/schemas.py` if this schema changes.

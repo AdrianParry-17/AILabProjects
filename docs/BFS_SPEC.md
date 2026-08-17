@@ -145,4 +145,4 @@ and (when the dataset provides one) a short comparison to an alternative route.
 
 - `ALGORITHM_SPEC.md` — shared signature, output model, validation, cost function.
 - `docs/DATASET_SPEC.md` / `docs/DELIVERY_GRAPH.md` — graph inputs.
-- `docs/MAP_CONTRACT.md` — how `SearchResult` and the expanded route are animated.
+- `backend/app/schemas.py` — how `SearchResult` and the expanded route are served.

@@ -1,7 +1,8 @@
 """Visualization layer: map/report serialization of graphs and routes.
 
 Depends on `shared` (+ optionally `core`/`delivery` for their data shapes). Contains
-no search logic — it only renders what other layers compute (ARCHITECTURE.md § 3).
+no search logic — it only renders what other layers compute (dependency flow in
+CONVENTION.md § 2).
 """
 
 from visualization.geojson import (
