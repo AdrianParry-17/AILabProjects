@@ -164,7 +164,14 @@ scripts/overpass_hcmc.ql          -> Overpass QL query
 scripts/fetch_overpass.py         -> POST -> data/raw/hcmc_overpass.json        (RAW)
 scripts/build_osm_snapshot.py     -> contract OSM -> data/processed/graph.json  (road graph)
 scripts/build_delivery_graph.py   -> road graph -> data/exports/delivery_graph.json (delivery)
+scripts/import_hcmc_snapshot.py   -> road graph + raw -> backend/data/hcmc_delivery_osm_snapshot.json (backend canonical)
 ```
+
+`scripts/import_hcmc_snapshot.py` converts `data/processed/graph.json` into the
+backend canonical snapshot consumed by `backend/app/` (FastAPI). It validates the
+schema, normalizes risk to a `[0,1]` fraction, reconstructs speeds, computes SCCs,
+and refuses to expand two-way rows a second time (each source row is already one
+directed arc). Runtime never reads `data/processed/` or `data/raw/` directly.
 
 ### 6.1 Query
 
