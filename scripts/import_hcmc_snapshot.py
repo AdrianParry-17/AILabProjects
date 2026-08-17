@@ -1,9 +1,8 @@
-"""Migrate the processed road graph into the backend's canonical dataset.
+"""Migrate the teammate HCMC graph export into the app's canonical dataset.
 
-Adapted from the reference project (AI-App-Map-Search): the processed export is
-deliberately treated as an import artifact. Runtime code only reads the generated
-snapshot under ``backend/data``; it never imports from or depends on the
-``data/processed`` workspace.
+The source export is deliberately treated as an import artifact. Runtime code
+only reads the generated snapshot under ``backend/data``; it never imports from
+or depends on ``backend/data-tmp``.
 
 The source already contains directed arcs. In particular, every source record
 labelled ``two-way`` has a separate reverse record, so this importer must not
@@ -23,8 +22,8 @@ from typing import Any
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_INPUT = PROJECT_ROOT / "data" / "processed" / "graph.json"
-DEFAULT_RAW_INPUT = PROJECT_ROOT / "data" / "raw" / "hcmc_overpass.json"
+DEFAULT_INPUT = PROJECT_ROOT / "backend" / "data-tmp" / "processed" / "graph.json"
+DEFAULT_RAW_INPUT = PROJECT_ROOT / "backend" / "data-tmp" / "raw" / "hcmc_overpass.json"
 DEFAULT_OUTPUT = PROJECT_ROOT / "backend" / "data" / "hcmc_delivery_osm_snapshot.json"
 ROAD_SPEED_FALLBACKS = {
     "primary": 45.0,
