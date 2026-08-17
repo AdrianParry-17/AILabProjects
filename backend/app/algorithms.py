@@ -331,42 +331,10 @@ def _bfs(context: SearchContext) -> SearchResult:
 
 
 def _dfs(context: SearchContext) -> SearchResult:
-    trivial = _start_is_goal(context)
-    if trivial:
-        return trivial
-    stack: list[tuple[str, int]] = [(context.start, 0)]
-    discovered = {context.start}
-    parents: dict[str, tuple[str, str]] = {}
-    g_cost = {context.start: 0.0}
-    context.trace.emit("start", node_id=context.start, frontier_size=1, g_cost=0, depth=0)
-    while stack:
-        node, depth = stack.pop()
-        if not context.expand(node):
-            break
-        context.trace.emit(
-            "expand", node_id=node, frontier_size=len(stack),
-            explored_count=context.expanded_count, g_cost=g_cost[node], depth=depth,
-        )
-        if node == context.goal:
-            path, edges = _reconstruct(parents, context.start, context.goal)
-            return context.finish(path, edges)
-        candidates = list(context.traversable(context.graph.neighbors(node)))
-        for edge in reversed(candidates):
-            child = edge.target
-            if child in discovered:
-                continue
-            discovered.add(child)
-            parents[child] = (node, edge.id)
-            g_cost[child] = g_cost[node] + context.cost.edge_cost(edge)
-            stack.append((child, depth + 1))
-            context.generated_count += 1
-            context.trace.emit(
-                "discover", node_id=child, parent_id=node, edge_id=edge.id,
-                frontier_size=len(stack), explored_count=context.expanded_count,
-                g_cost=g_cost[child], depth=depth + 1,
-            )
-        context.update_frontier_peak(len(stack))
-    return context.finish()
+    raise NotImplementedError(
+        "DFS is a placeholder on this branch; the owner (Văn Phú Đức) will port "
+        "the implementation from the reference project in a later commit."
+    )
 
 
 def _uniform_cost(context: SearchContext) -> SearchResult:
@@ -466,232 +434,25 @@ def _astar(context: SearchContext) -> SearchResult:
 
 
 def _greedy(context: SearchContext) -> SearchResult:
-    trivial = _start_is_goal(context)
-    if trivial:
-        return trivial
-    counter = itertools.count()
-    initial_h = context.h(context.start)
-    heap: list[tuple[float, int, str]] = [(initial_h, next(counter), context.start)]
-    discovered = {context.start}
-    parents: dict[str, tuple[str, str]] = {}
-    g_cost = {context.start: 0.0}
-    context.trace.emit(
-        "start", node_id=context.start, frontier_size=1,
-        g_cost=0, h_cost=initial_h, f_cost=initial_h,
+    raise NotImplementedError(
+        "Greedy Best-First is a placeholder on this branch; the owning teammate "
+        "will port the implementation from the reference project in a later commit."
     )
-    while heap:
-        node_h, _, node = heapq.heappop(heap)
-        if not context.expand(node):
-            break
-        context.trace.emit(
-            "expand", node_id=node, frontier_size=len(heap),
-            explored_count=context.expanded_count, g_cost=g_cost[node],
-            h_cost=node_h, f_cost=node_h,
-        )
-        if node == context.goal:
-            path, edges = _reconstruct(parents, context.start, context.goal)
-            return context.finish(path, edges)
-        for edge in context.traversable(context.graph.neighbors(node)):
-            child = edge.target
-            if child in discovered:
-                continue
-            discovered.add(child)
-            parents[child] = (node, edge.id)
-            g_cost[child] = g_cost[node] + context.cost.edge_cost(edge)
-            child_h = context.h(child)
-            heapq.heappush(heap, (child_h, next(counter), child))
-            context.generated_count += 1
-            context.trace.emit(
-                "discover", node_id=child, parent_id=node, edge_id=edge.id,
-                frontier_size=len(heap), explored_count=context.expanded_count,
-                g_cost=g_cost[child], h_cost=child_h, f_cost=child_h,
-            )
-        context.update_frontier_peak(len(heap))
-    return context.finish()
 
 
 def _bidirectional_dijkstra(context: SearchContext) -> SearchResult:
-    trivial = _start_is_goal(context)
-    if trivial:
-        return trivial
-    counter = itertools.count()
-    forward_heap: list[tuple[float, int, str]] = [(0.0, next(counter), context.start)]
-    backward_heap: list[tuple[float, int, str]] = [(0.0, next(counter), context.goal)]
-    forward_dist = {context.start: 0.0}
-    backward_dist = {context.goal: 0.0}
-    forward_parent: dict[str, tuple[str, str]] = {}
-    backward_next: dict[str, tuple[str, str]] = {}
-    forward_settled: set[str] = set()
-    backward_settled: set[str] = set()
-    best = inf
-    meeting: str | None = None
-    context.generated_count = 2
-    context.frontier_peak = 2
-    context.trace.emit(
-        "start", node_id=context.start, direction="forward", frontier_size=2,
-        g_cost=0, message=f"Forward from {context.start}; backward from {context.goal}",
+    raise NotImplementedError(
+        "Bidirectional Dijkstra is a placeholder on this branch; the owner "
+        "(Huỳnh Minh Hùng) will port the implementation from the reference "
+        "project in a later commit."
     )
-
-    def clean(heap: list[tuple[float, int, str]], distances: dict[str, float], settled: set[str]) -> None:
-        while heap and (heap[0][2] in settled or heap[0][0] > distances.get(heap[0][2], inf)):
-            heapq.heappop(heap)
-
-    while forward_heap and backward_heap:
-        clean(forward_heap, forward_dist, forward_settled)
-        clean(backward_heap, backward_dist, backward_settled)
-        if not forward_heap or not backward_heap:
-            break
-        if forward_heap[0][0] + backward_heap[0][0] >= best - 1e-12:
-            break
-        go_forward = forward_heap[0][0] <= backward_heap[0][0]
-        heap = forward_heap if go_forward else backward_heap
-        distance = forward_dist if go_forward else backward_dist
-        settled = forward_settled if go_forward else backward_settled
-        current_cost, _, node = heapq.heappop(heap)
-        if node in settled:
-            continue
-        if not context.expand(node):
-            break
-        settled.add(node)
-        direction = "forward" if go_forward else "backward"
-        context.trace.emit(
-            "expand", node_id=node, direction=direction,
-            frontier_size=len(forward_heap) + len(backward_heap),
-            explored_count=context.expanded_count, g_cost=current_cost,
-        )
-
-        other_dist = backward_dist if go_forward else forward_dist
-        if node in other_dist and current_cost + other_dist[node] < best:
-            best = current_cost + other_dist[node]
-            meeting = node
-
-        edges = context.graph.neighbors(node) if go_forward else context.graph.incoming(node)
-        for edge in context.traversable(edges):
-            child = edge.target if go_forward else edge.source
-            candidate = current_cost + context.cost.edge_cost(edge)
-            if candidate + 1e-12 >= distance.get(child, inf):
-                continue
-            distance[child] = candidate
-            if go_forward:
-                forward_parent[child] = (node, edge.id)
-            else:
-                backward_next[child] = (node, edge.id)
-            heapq.heappush(heap, (candidate, next(counter), child))
-            context.generated_count += 1
-            context.trace.emit(
-                "relax", node_id=child, parent_id=node, edge_id=edge.id,
-                direction=direction,
-                frontier_size=len(forward_heap) + len(backward_heap),
-                explored_count=context.expanded_count, g_cost=candidate,
-            )
-            if child in other_dist and candidate + other_dist[child] < best:
-                best = candidate + other_dist[child]
-                meeting = child
-        context.update_frontier_peak(len(forward_heap) + len(backward_heap))
-
-    if meeting is None:
-        return context.finish()
-    prefix_nodes, prefix_edges = _reconstruct(forward_parent, context.start, meeting)
-    if not prefix_nodes:
-        return context.finish()
-    suffix_nodes: list[str] = []
-    suffix_edges: list[str] = []
-    current = meeting
-    while current != context.goal:
-        if current not in backward_next:
-            return context.finish()
-        next_node, edge_id = backward_next[current]
-        suffix_nodes.append(next_node)
-        suffix_edges.append(edge_id)
-        current = next_node
-    return context.finish(prefix_nodes + suffix_nodes, prefix_edges + suffix_edges)
 
 
 def _ida_star(context: SearchContext) -> SearchResult:
-    trivial = _start_is_goal(context)
-    if trivial:
-        return trivial
-    threshold = context.h(context.start)
-    path_nodes = [context.start]
-    path_edges: list[str] = []
-    on_path = {context.start}
-    found_nodes: list[str] | None = None
-    found_edges: list[str] | None = None
-    can_prune_repeated_states = context.heuristic_metadata.consistent
-    best_g_seen: dict[str, float] = {}
-    context.trace.emit(
-        "start", node_id=context.start, frontier_size=1,
-        g_cost=0, h_cost=threshold, f_cost=threshold, depth=0,
+    raise NotImplementedError(
+        "IDA* is a placeholder on this branch; the owner (Huỳnh Minh Hùng) will "
+        "port the implementation from the reference project in a later commit."
     )
-
-    def visit(node: str, g_cost: float, bound: float, depth: int) -> float:
-        nonlocal found_nodes, found_edges, best_g_seen
-        heuristic = context.h(node)
-        f_cost = g_cost + heuristic
-        if f_cost > bound + 1e-12:
-            context.trace.emit(
-                "prune", node_id=node, frontier_size=len(path_nodes),
-                explored_count=context.expanded_count, g_cost=g_cost,
-                h_cost=heuristic, f_cost=f_cost, depth=depth,
-                message=f"f-cost exceeds threshold {bound:.6f}",
-            )
-            return f_cost
-        if can_prune_repeated_states:
-            previous_g = best_g_seen.get(node)
-            if previous_g is not None and previous_g < g_cost - 1e-12:
-                return inf
-            best_g_seen[node] = g_cost
-        if not context.expand(node):
-            return inf
-        context.trace.emit(
-            "expand", node_id=node, frontier_size=len(path_nodes),
-            explored_count=context.expanded_count, g_cost=g_cost,
-            h_cost=heuristic, f_cost=f_cost, depth=depth,
-        )
-        if node == context.goal:
-            found_nodes = list(path_nodes)
-            found_edges = list(path_edges)
-            return -inf
-
-        next_bound = inf
-        for edge in context.traversable(context.graph.neighbors(node)):
-            child = edge.target
-            if child in on_path:
-                continue
-            context.generated_count += 1
-            path_nodes.append(child)
-            path_edges.append(edge.id)
-            on_path.add(child)
-            context.update_frontier_peak(len(path_nodes))
-            context.trace.emit(
-                "discover", node_id=child, parent_id=node, edge_id=edge.id,
-                frontier_size=len(path_nodes), explored_count=context.expanded_count,
-                g_cost=g_cost + context.cost.edge_cost(edge), depth=depth + 1,
-            )
-            value = visit(child, g_cost + context.cost.edge_cost(edge), bound, depth + 1)
-            if value == -inf:
-                return -inf
-            next_bound = min(next_bound, value)
-            on_path.remove(child)
-            path_edges.pop()
-            path_nodes.pop()
-            if context.limit_reached:
-                return inf
-        return next_bound
-
-    while isfinite(threshold) and not context.limit_reached:
-        context.trace.emit(
-            "iteration", node_id=context.start, frontier_size=1,
-            explored_count=context.expanded_count, f_cost=threshold,
-            message=f"IDA* threshold {threshold:.6f}",
-        )
-        next_threshold = visit(context.start, 0.0, threshold, 0)
-        if next_threshold == -inf:
-            return context.finish(found_nodes, found_edges)
-        if not isfinite(next_threshold):
-            break
-        threshold = next_threshold
-    return context.finish()
 
 
 def run_algorithm(
