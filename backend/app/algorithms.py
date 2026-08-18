@@ -331,10 +331,42 @@ def _bfs(context: SearchContext) -> SearchResult:
 
 
 def _dfs(context: SearchContext) -> SearchResult:
-    raise NotImplementedError(
-        "DFS is a placeholder on this branch; the owner (Văn Phú Đức) will port "
-        "the implementation from the reference project in a later commit."
-    )
+    trivial = _start_is_goal(context)
+    if trivial:
+        return trivial
+    stack: list[tuple[str, int]] = [(context.start, 0)]
+    discovered = {context.start}
+    parents: dict[str, tuple[str, str]] = {}
+    g_cost = {context.start: 0.0}
+    context.trace.emit("start", node_id=context.start, frontier_size=1, g_cost=0, depth=0)
+    while stack:
+        node, depth = stack.pop()
+        if not context.expand(node):
+            break
+        context.trace.emit(
+            "expand", node_id=node, frontier_size=len(stack),
+            explored_count=context.expanded_count, g_cost=g_cost[node], depth=depth,
+        )
+        if node == context.goal:
+            path, edges = _reconstruct(parents, context.start, context.goal)
+            return context.finish(path, edges)
+        candidates = list(context.traversable(context.graph.neighbors(node)))
+        for edge in reversed(candidates):
+            child = edge.target
+            if child in discovered:
+                continue
+            discovered.add(child)
+            parents[child] = (node, edge.id)
+            g_cost[child] = g_cost[node] + context.cost.edge_cost(edge)
+            stack.append((child, depth + 1))
+            context.generated_count += 1
+            context.trace.emit(
+                "discover", node_id=child, parent_id=node, edge_id=edge.id,
+                frontier_size=len(stack), explored_count=context.expanded_count,
+                g_cost=g_cost[child], depth=depth + 1,
+            )
+        context.update_frontier_peak(len(stack))
+    return context.finish()
 
 
 def _uniform_cost(context: SearchContext) -> SearchResult:
