@@ -1,29 +1,29 @@
-# Đà Nẵng Route Intelligence Lab
+# HCMC Delivery Route Intelligence Lab
 
-Một web app full-stack để học, chạy và **nhìn thấy** các thuật toán tìm kiếm trên mạng đường có nguồn gốc OpenStreetMap ở trung tâm Đà Nẵng. Scenario là điều phối xe cấp cứu tới cơ sở y tế trong điều kiện giao thông đô thị Việt Nam; ứng dụng phục vụ bài lab AI, **không phải** hệ thống dispatch/navigation ngoài đời thật.
+Một ứng dụng full-stack chạy trên localhost để học, chạy và trực quan hóa các thuật toán tìm kiếm trên mạng đường trung tâm Thành phố Hồ Chí Minh. Bối cảnh là lập tuyến cho courier/shipper: một điểm lấy hàng, một điểm giao hàng, hoặc nhiều điểm cần ghé. Đây là phòng thí nghiệm AI dùng snapshot OpenStreetMap và lớp giao thông mô phỏng, không phải hệ thống điều hướng thời gian thực.
 
-![A* route, trace playback and explanation](docs/assets/route-result.png)
+> Phạm vi dữ liệu là một ô trung tâm thành phố, không phải toàn bộ địa giới Thành phố Hồ Chí Minh. Kết quả chỉ dùng cho học tập và demo.
 
 ## Điểm nổi bật
 
-- FastAPI backend tự cài đặt thủ công 8 thuật toán: BFS, DFS, UCS, Dijkstra, A*, Greedy Best-First, Bidirectional Dijkstra và IDA*.
-- 4 chiến lược multi-stop: Nearest Neighbor, Held–Karp exact, 2-opt và seeded Simulated Annealing.
-- Graph OSM offline-first: **512 nodes, 1,007 directed edges**, 24 hospital POI; giữ one-way, tên/loại đường và polyline geometry.
-- 5 scenario deterministic: normal, morning rush, evening rush, heavy rain và incident/closure.
-- Cost minh bạch gồm distance, travel time, traffic delay và risk exposure; tùy chỉnh weights trực tiếp.
-- Registry heuristic ghi rõ admissible/consistent: zero, Haversine, optimistic travel time; thêm traffic-aware để minh họa heuristic thực dụng nhưng không bảo đảm.
-- React command center với OSM basemap, traffic layer, click-to-snap, visited/frontier/current-node animation, timeline playback, metrics, cost breakdown, alternative route và algorithm arena.
-- Lời giải thích deterministic: nêu criterion, traffic impact, heuristic/optimality và so với route đối chứng.
-- Backend test coverage hiện tại khoảng 89%; frontend có contract-adapter tests; dữ liệu và geometry có regression tests.
+- FastAPI backend tự cài đặt 8 thuật toán: BFS, DFS, UCS, Dijkstra, A*, Greedy Best-First, Bidirectional Dijkstra và IDA*.
+- 4 chiến lược cho hành trình nhiều điểm: Nearest Neighbor, Held–Karp exact, 2-opt và seeded Simulated Annealing.
+- Snapshot canonical offline-first có **1.103 node và 2.279 cung có hướng**. Mỗi record đã là một cung; loader không nhân đôi các record được nguồn gắn nhãn two-way.
+- 187 POI giao nhận từ năm nhóm OSM: chợ, siêu thị, trường đại học, bệnh viện và bến xe buýt.
+- 172 POI nằm trong strongly connected component chính gồm 992 node. Dataset có tổng cộng 85 SCC và metadata đánh dấu rõ node primary/peripheral để client chọn điểm an toàn hơn.
+- 5 kịch bản deterministic: normal, morning rush, evening rush, heavy rain và road disruption.
+- Hàm chi phí minh bạch gồm distance, travel time, traffic delay và risk exposure; người dùng có thể thay đổi weights.
+- Registry heuristic ghi rõ admissible/consistent: zero, Haversine, optimistic travel time và traffic-aware.
+- React/Vite UI có OSM basemap, chọn điểm trên bản đồ, phát lại cây tìm kiếm, metrics, cost breakdown, tuyến đối chứng và benchmark thuật toán.
 
 ## Chạy nhanh trên Windows
 
 Yêu cầu: Python 3.11–3.13, Node.js 20+ và npm.
 
-```powershell
+~~~powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\setup.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\start-dev.ps1
-```
+~~~
 
 Sau đó mở:
 
@@ -33,7 +33,7 @@ Sau đó mở:
 
 Hoặc chạy hai terminal riêng:
 
-```powershell
+~~~powershell
 # Terminal 1
 cd backend
 py -3.13 -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
@@ -41,26 +41,27 @@ py -3.13 -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 # Terminal 2
 cd frontend
 npm run dev
-```
+~~~
 
-Kiểm tra toàn bộ:
+Kiểm tra toàn bộ project:
 
-```powershell
+~~~powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\check.ps1
-```
+~~~
 
 ## Luồng sử dụng
 
-1. Chọn `Tìm tuyến`, điểm đi/đến, scenario, algorithm, heuristic và objective.
-2. Bấm **Tìm tuyến & tạo lời giải thích**.
-3. Dùng timeline để phát, dừng, step hoặc đổi tốc độ; map tô current/frontier/visited/final route.
-4. Mở `So sánh` để chạy 2–8 thuật toán trên **cùng** graph/scenario/weights.
-5. Mở `Nhiều điểm`, chọn tối đa 12 stops; Held–Karp exact giới hạn 10 stops.
-6. Mở `Thuật toán` để xem guarantee, complexity và độ an toàn của heuristic.
+1. Mở <strong>Tìm tuyến</strong>, chọn điểm lấy hàng và điểm giao hàng.
+2. Chọn traffic scenario, thuật toán, heuristic và objective.
+3. Bấm <strong>Tìm tuyến & tạo lời giải thích</strong>.
+4. Dùng timeline để phát, dừng hoặc step qua current node, frontier và cây đã khám phá.
+5. Mở <strong>So sánh</strong> để chạy 2–8 thuật toán trên cùng graph, scenario và weights.
+6. Mở <strong>Nhiều điểm</strong> để tối ưu thứ tự ghé cho một danh sách giao hàng.
+7. Mở <strong>Thuật toán</strong> để xem complexity, completeness, optimality và điều kiện của heuristic.
 
 ## Kiến trúc
 
-```text
+~~~text
 React + TypeScript + Leaflet + Recharts + Motion
                    │ REST /api/v1
                    ▼
@@ -68,43 +69,56 @@ FastAPI → cost/traffic/heuristic registries → 8 search runners
                    │
                    ├─ explanation + alternative-route engine
                    ├─ multi-stop optimizer
-                   └─ bundled directed OSM snapshot (JSON)
-```
+                   └─ backend/data/hcmc_delivery_osm_snapshot.json
+~~~
 
-Backend không dùng NetworkX cho search. Mọi algorithm trả cùng một normalized contract để UI dùng một renderer cho trace và metrics. API contract đầy đủ nằm trong [`docs/API.md`](docs/API.md), còn code backend nằm trong [`backend/app`](backend/app).
+Backend không dùng NetworkX cho search. Các thuật toán trả cùng một response contract để frontend dùng chung renderer cho trace và metrics.
 
-## Data và tính đúng đắn
+React tải topology/geometry đúng một lần bằng `/graph?compact=true`. Khi đổi scenario, client chỉ lấy status cạnh từ `/traffic` rồi cập nhật màu đường theo các chunk `requestAnimationFrame`; full effect vẫn giữ nguyên nhưng không khóa main thread bằng cách parse và restyle toàn graph đồng bộ.
 
-Topology/tags/geometry được tải **một lần** bằng bounded Overpass query tại [`scripts/overpass_danang.ql`](scripts/overpass_danang.ql), sau đó contract bằng [`scripts/build_osm_snapshot.py`](scripts/build_osm_snapshot.py). Runtime routing chỉ đọc snapshot local; nó không gọi Overpass hay Nominatim.
+## Dataset và provenance
 
-- OSM cung cấp topology, coordinates, names, highway class, one-way và hospital POI.
-- Congestion, incident, closure, flood susceptibility, risk và ETA là lớp **deterministic synthetic educational** có ghi provenance.
-- Một hospital access connector được snap vào main strongly-connected component; tất cả 552 ordered hospital pairs đều reachable.
-- Public Nominatim không được nhúng làm autocomplete mặc định. Chọn địa điểm dùng local graph index/map click để tránh vi phạm policy và để demo không phụ thuộc mạng.
-- OSM tile chỉ tải cho viewport hiện tại, có attribution hiển thị; đặt `VITE_ENABLE_OSM_TILES=false` để chạy không basemap.
+Runtime chỉ đọc file canonical:
 
-Chi tiết nguồn, schema, assumptions và cách refresh an toàn: [`docs/DATASET.md`](docs/DATASET.md). Dataset tuân theo ODbL 1.0; xem [`NOTICE.md`](NOTICE.md).
+<code>backend/data/hcmc_delivery_osm_snapshot.json</code>
+
+Snapshot có bbox <code>[10.750, 106.665, 10.800, 106.715]</code> theo thứ tự south, west, north, east. Query nguồn chỉ lấy các trục <code>primary|secondary|tertiary</code> cùng link tương ứng và năm nhóm POI, vì vậy dataset không đại diện đầy đủ hẻm, đường nội bộ, turn restriction hay toàn bộ thành phố.
+
+Dữ liệu do teammate scrape/import được giữ ở <code>backend/data-tmp/</code> và đã được git-ignore. Thư mục đó là input tạm cho bước migration, không phải dependency runtime. Pipeline chuẩn hóa:
+
+~~~powershell
+python scripts/import_hcmc_snapshot.py
+~~~
+
+Script đọc processed graph và raw Overpass export trong thư mục tạm, kiểm tra schema/direction/geometry/speed/risk, rồi ghi snapshot canonical vào <code>backend/data</code>. Sau khi snapshot đã tồn tại, backend và frontend vẫn chạy khi <code>data-tmp</code> không có mặt.
+
+Phân tách nguồn dữ liệu:
+
+- OSM snapshot: topology, coordinates, road/POI names, highway class, one-way tags, geometry và một phần maxspeed.
+- Derived: contraction, POI connector, speed fallback theo road class và component membership.
+- Synthetic educational layer: baseline congestion, scenario multipliers, flood/disruption flags, closures, risk và ETA.
+
+Chi tiết schema, checksum, phép dựng speed và các giới hạn nằm trong [docs/DATASET.md](docs/DATASET.md). Điều khoản OSM/ODbL nằm trong [NOTICE.md](NOTICE.md).
 
 ## Cấu trúc project
 
-```text
-backend/                 FastAPI, algorithms, optimizers, tests, datasets
-frontend/                React/Vite UI và API adapter tests
-scripts/                 setup/dev/check + bounded OSM snapshot pipeline
-docs/                    report, rubric matrix, API, demo-video script
+~~~text
+backend/                 FastAPI, algorithms, optimizers, tests, canonical datasets
+frontend/                React/Vite UI, API adapter và Playwright tests
+scripts/                 setup/dev/check + HCMC import pipeline
+docs/                    report, API, dataset, rubric và demo script
 README.md                hướng dẫn tổng quan
-```
+~~~
 
-## Tài liệu nộp lab
+## Tài liệu
 
-- [`docs/TECHNICAL_REPORT.md`](docs/TECHNICAL_REPORT.md): report đầy đủ, có placeholder thông tin nhóm/screenshots.
-- [`docs/ALGORITHM_REFERENCE.md`](docs/ALGORITHM_REFERENCE.md): nguyên lý, complexity, completeness, optimality và heuristic.
-- [`docs/RUBRIC_CHECKLIST.md`](docs/RUBRIC_CHECKLIST.md): map từng mục rubric sang code/demo evidence.
-- [`docs/DEMO_VIDEO_SCRIPT.md`](docs/DEMO_VIDEO_SCRIPT.md): kịch bản video đúng yêu cầu đề.
-- [`docs/DATASET.md`](docs/DATASET.md): provenance và data dictionary.
+- [docs/TECHNICAL_REPORT.md](docs/TECHNICAL_REPORT.md): báo cáo kỹ thuật.
+- [docs/ALGORITHM_REFERENCE.md](docs/ALGORITHM_REFERENCE.md): nguyên lý và guarantee của thuật toán.
+- [docs/API.md](docs/API.md): API contract.
+- [docs/RUBRIC_CHECKLIST.md](docs/RUBRIC_CHECKLIST.md): mapping rubric sang evidence.
+- [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md): kịch bản video.
+- [docs/DATASET.md](docs/DATASET.md): provenance, schema và data audit.
 
-Trước khi nộp, nhóm vẫn cần điền thông tin thành viên, thêm ảnh chụp thật, export report/slides PDF/PPTX, quay video và đóng gói theo đúng `[GroupID].zip` của đề.
+## Giới hạn sử dụng
 
-## Safety
-
-Đây là mô phỏng học thuật. Không dùng output làm chỉ dẫn điều phối xe cấp cứu, điều hướng hoặc quyết định an toàn. Basemap và snapshot có thể cũ/thiếu; traffic không phải dữ liệu live.
+Ứng dụng không có GPS, live traffic, trạng thái đơn hàng, năng lực phương tiện, turn-by-turn guidance hay đảm bảo an toàn. Basemap và snapshot có thể cũ hoặc thiếu; traffic, ETA và risk là ước lượng giáo dục deterministic. Không dùng output làm chỉ dẫn giao thông thực tế hoặc quyết định vận hành.
