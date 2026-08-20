@@ -360,7 +360,75 @@ def _dfs(context: SearchContext) -> SearchResult:
         context.update_frontier_peak(len(stack))
     return context.finish()
 
-# Rewrote and split Dijkstra and UCS
+def _uniform_cost(context: SearchContext) -> SearchResult:
+    trivial = _start_is_goal(context)
+    if trivial:
+        return trivial
+
+    # Every frontier item is (total_cost, tie_breaker, node_id).
+    # total_cost decides the priority.  tie_breaker is just a counter so two
+    # items with the same cost are never compared by their node ids.
+    tie_breaker = itertools.count()
+    frontier: list[tuple[float, int, str]] = [
+        (0.0, next(tie_breaker), context.start)
+    ]
+
+    # best_cost[node] = cheapest known cost to reach "node" so far.
+    best_cost = {context.start: 0.0}
+
+    # parents[node] = (previous node, edge used) to rebuild the path later.
+    parents: dict[str, tuple[str, str]] = {}
+
+    context.trace.emit(
+        "start", node_id=context.start, frontier_size=1, g_cost=0, f_cost=0,
+    )
+
+    while frontier:
+        total_cost, _, current_node = heapq.heappop(frontier)
+
+        # The same node can be pushed into the frontier several times, each
+        # time with a better cost.  Skip the old, more expensive copies.
+        if total_cost > best_cost.get(current_node, inf):
+            continue
+
+        if not context.expand(current_node):
+            break
+
+        context.trace.emit(
+            "expand", node_id=current_node, frontier_size=len(frontier),
+            explored_count=context.expanded_count,
+            g_cost=total_cost, f_cost=total_cost,
+        )
+
+        # The first time a node is popped its cost is final, so if it is the
+        # goal node we can stop and rebuild the path.
+        if current_node == context.goal:
+            path, edges = _reconstruct(parents, context.start, context.goal)
+            return context.finish(path, edges)
+
+        for edge in context.traversable(context.graph.neighbors(current_node)):
+            neighbor = edge.target
+            new_cost = total_cost + context.cost.edge_cost(edge)
+
+            # Keep the neighbor only if this route improves its best cost.
+            if new_cost >= best_cost.get(neighbor, inf):
+                continue
+
+            best_cost[neighbor] = new_cost
+            parents[neighbor] = (current_node, edge.id)
+            heapq.heappush(frontier, (new_cost, next(tie_breaker), neighbor))
+
+            context.generated_count += 1
+            context.trace.emit(
+                "relax", node_id=neighbor, parent_id=current_node, edge_id=edge.id,
+                frontier_size=len(frontier), explored_count=context.expanded_count,
+                g_cost=new_cost, f_cost=new_cost,
+            )
+
+        context.update_frontier_peak(len(frontier))
+
+    return context.finish()
+
 
 def _dijkstra(context: SearchContext) -> SearchResult:
     trivial = _start_is_goal(context)
@@ -411,99 +479,84 @@ def _dijkstra(context: SearchContext) -> SearchResult:
         context.update_frontier_peak(len(heap))
     return context.finish()
 
-def _uniform_cost(context: SearchContext) -> SearchResult:
-    trivial = _start_is_goal(context)
-    if trivial:
-        return trivial
-    counter = itertools.count()
-    heap: list[tuple[float, int, str]] = [(0.0, next(counter), context.start)]
-    distances = {context.start: 0.0}
-    parents: dict[str, tuple[str, str]] = {}
-    settled: set[str] = set()
-    context.trace.emit("start", node_id=context.start, frontier_size=1, g_cost=0, f_cost=0)
-    while heap:
-        current_cost, _, node = heapq.heappop(heap)
-        if node in settled or current_cost > distances.get(node, inf):
-            continue
-        if not context.expand(node):
-            break
-        settled.add(node)
-        context.trace.emit(
-            "expand", node_id=node, frontier_size=len(heap),
-            explored_count=context.expanded_count, g_cost=current_cost, f_cost=current_cost,
-        )
-        if node == context.goal:
-            path, edges = _reconstruct(parents, context.start, context.goal)
-            return context.finish(path, edges)
-        for edge in context.traversable(context.graph.neighbors(node)):
-            child = edge.target
-            candidate = current_cost + context.cost.edge_cost(edge)
-            if candidate + 1e-12 >= distances.get(child, inf):
-                continue
-            distances[child] = candidate
-            parents[child] = (node, edge.id)
-            heapq.heappush(heap, (candidate, next(counter), child))
-            context.generated_count += 1
-            context.trace.emit(
-                "relax", node_id=child, parent_id=node, edge_id=edge.id,
-                frontier_size=len(heap), explored_count=context.expanded_count,
-                g_cost=candidate, f_cost=candidate,
-            )
-        context.update_frontier_peak(len(heap))
-    return context.finish()
-
 
 def _astar(context: SearchContext) -> SearchResult:
     trivial = _start_is_goal(context)
     if trivial:
         return trivial
-    counter = itertools.count()
+
+    # Every frontier item is (f_cost, tie_breaker, g_cost, node_id).
+    # tie_breaker avoids comparing two node ids with the same f_cost.
+    tie_breaker = itertools.count()
     initial_h = context.h(context.start)
-    heap: list[tuple[float, int, float, str]] = [
-        (initial_h, next(counter), 0.0, context.start)
+    frontier: list[tuple[float, int, float, str]] = [
+        (initial_h, next(tie_breaker), 0.0, context.start)
     ]
-    distances = {context.start: 0.0}
+
+    # best_g[node] = cheapest known cost to reach "node" so far.
+    best_g = {context.start: 0.0}
+
+    # closed[node] = the cost at which "node" was last expanded.  It stops us
+    # from expanding a node a second time at the same (or worse) cost.
+    closed: dict[str, float] = {}
+
+    # parents[node] = (previous node, edge used) to rebuild the path later.
     parents: dict[str, tuple[str, str]] = {}
-    closed_best: dict[str, float] = {}
+
     context.trace.emit(
         "start", node_id=context.start, frontier_size=1,
         g_cost=0, h_cost=initial_h, f_cost=initial_h,
     )
-    while heap:
-        f_cost, _, current_cost, node = heapq.heappop(heap)
-        if current_cost > distances.get(node, inf) + 1e-12:
+
+    while frontier:
+        f_cost, _, g_cost, current_node = heapq.heappop(frontier)
+
+        # 1e-12 is a tiny tolerance so near-equal floating-point numbers are
+        # treated as equal instead of causing spurious re-expansions.
+        if g_cost > best_g.get(current_node, inf) + 1e-12:
             continue
-        if current_cost >= closed_best.get(node, inf) - 1e-12:
+        if g_cost >= closed.get(current_node, inf) - 1e-12:
             continue
-        if not context.expand(node):
+
+        if not context.expand(current_node):
             break
-        closed_best[node] = current_cost
-        node_h = max(0.0, f_cost - current_cost)
+
+        closed[current_node] = g_cost
+        h_cost = max(0.0, f_cost - g_cost)
+
         context.trace.emit(
-            "expand", node_id=node, frontier_size=len(heap),
-            explored_count=context.expanded_count, g_cost=current_cost,
-            h_cost=node_h, f_cost=f_cost,
+            "expand", node_id=current_node, frontier_size=len(frontier),
+            explored_count=context.expanded_count, g_cost=g_cost,
+            h_cost=h_cost, f_cost=f_cost,
         )
-        if node == context.goal:
+
+        if current_node == context.goal:
             path, edges = _reconstruct(parents, context.start, context.goal)
             return context.finish(path, edges)
-        for edge in context.traversable(context.graph.neighbors(node)):
-            child = edge.target
-            candidate = current_cost + context.cost.edge_cost(edge)
-            if candidate + 1e-12 >= distances.get(child, inf):
+
+        for edge in context.traversable(context.graph.neighbors(current_node)):
+            neighbor = edge.target
+            new_g = g_cost + context.cost.edge_cost(edge)
+
+            if new_g + 1e-12 >= best_g.get(neighbor, inf):
                 continue
-            distances[child] = candidate
-            parents[child] = (node, edge.id)
-            child_h = context.h(child)
-            child_f = candidate + child_h
-            heapq.heappush(heap, (child_f, next(counter), candidate, child))
+
+            best_g[neighbor] = new_g
+            parents[neighbor] = (current_node, edge.id)
+
+            new_h = context.h(neighbor)
+            new_f = new_g + new_h
+            heapq.heappush(frontier, (new_f, next(tie_breaker), new_g, neighbor))
+
             context.generated_count += 1
             context.trace.emit(
-                "relax", node_id=child, parent_id=node, edge_id=edge.id,
-                frontier_size=len(heap), explored_count=context.expanded_count,
-                g_cost=candidate, h_cost=child_h, f_cost=child_f,
+                "relax", node_id=neighbor, parent_id=current_node, edge_id=edge.id,
+                frontier_size=len(frontier), explored_count=context.expanded_count,
+                g_cost=new_g, h_cost=new_h, f_cost=new_f,
             )
-        context.update_frontier_peak(len(heap))
+
+        context.update_frontier_peak(len(frontier))
+
     return context.finish()
 
 
